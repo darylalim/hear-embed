@@ -8,3 +8,17 @@ repos:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
+
+  # ty (type checker) runs via uv in the project venv so it can resolve the
+  # model deps (torch/transformers) — an isolated hook env couldn't. The whole
+  # project is checked at once (type checking needs the full module graph), so
+  # changed filenames aren't passed.
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty (type check)
+        entry: uv run ty check
+        language: system
+        types_or: [python, pyi]
+        pass_filenames: false
+        require_serial: true

@@ -127,6 +127,20 @@ automatically** unless `torch` + `transformers` are installed *and* you have
 authenticated access to the gated repo — point CI at an `HF_TOKEN` to make it
 run there.
 
+## Development
+
+```bash
+uv run ruff check --fix    # lint + autofix (incl. import sorting)
+uv run ruff format         # format
+uv run ty check            # type check
+uv run pre-commit install  # run ruff + ty automatically on every commit
+```
+
+`ty` is Astral's Rust type checker. It is **pre-1.0 (preview)**, so its exact
+version is pinned via `uv.lock` and behavior may shift between releases. It runs
+locally and in pre-commit — where the `model` group (torch/transformers) is
+installed so it can resolve those imports — rather than in the lean CI job.
+
 ## License
 
 This repository is Apache-2.0. The HeAR **model weights** are governed

@@ -30,6 +30,7 @@ dev = [
     "pre-commit>=4.6.0",
     "pytest>=8",
     "ruff>=0.15.17",
+    "ty>=0.0.48",
 ]
 # The HeAR encoder's runtime deps. Split into a group so CI can skip them with
 # `uv sync --no-group model`. transformers is pinned: google/hear-pytorch is
@@ -65,3 +66,11 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.format]
 docstring-code-format = true
+
+[tool.ty.environment]
+# Type-check against the minimum supported Python, matching requires-python.
+python-version = "3.10"
+
+[tool.ty.src]
+# Don't type-check Google's vendored audio_utils.py (kept unmodified upstream).
+exclude = ["hear_pipeline/_vendor"]
