@@ -25,7 +25,10 @@ dependencies = [
 hear-embed = "hear_pipeline.cli:main"
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "pytest>=8",
+    "ruff>=0.15.17",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["hear_pipeline"]
@@ -35,3 +38,16 @@ testpaths = ["tests"]
 markers = [
     "model: requires the gated HeAR model + torch/transformers (deselect with -m 'not model')",
 ]
+
+[tool.ruff]
+target-version = "py310"
+# Google's audio_utils.py is vendored unmodified — never lint/reformat it.
+# force-exclude keeps it excluded even when paths are passed explicitly (pre-commit/CI).
+extend-exclude = ["hear_pipeline/_vendor"]
+force-exclude = true
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.format]
+docstring-code-format = true

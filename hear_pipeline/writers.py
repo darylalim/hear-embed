@@ -65,7 +65,7 @@ class ParquetEmbeddingWriter:
     def close(self) -> None:
         self._writer.close()
 
-    def __enter__(self) -> "ParquetEmbeddingWriter":
+    def __enter__(self) -> ParquetEmbeddingWriter:
         return self
 
     def __exit__(self, *exc) -> None:
@@ -102,14 +102,28 @@ class NpzEmbeddingWriter:
         with open(csv_path, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
-                ["row", "source_file", "clip_index", "start_sample", "start_sec", "end_sec"]
+                [
+                    "row",
+                    "source_file",
+                    "clip_index",
+                    "start_sample",
+                    "start_sec",
+                    "end_sec",
+                ]
             )
             for row, m in enumerate(self._metadata):
                 writer.writerow(
-                    [row, m.source_file, m.clip_index, m.start_sample, m.start_sec, m.end_sec]
+                    [
+                        row,
+                        m.source_file,
+                        m.clip_index,
+                        m.start_sample,
+                        m.start_sec,
+                        m.end_sec,
+                    ]
                 )
 
-    def __enter__(self) -> "NpzEmbeddingWriter":
+    def __enter__(self) -> NpzEmbeddingWriter:
         return self
 
     def __exit__(self, *exc) -> None:

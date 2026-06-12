@@ -4,7 +4,7 @@ Typical library use::
 
     from hear_pipeline import HearEmbedder, embed_file
 
-    embedder = HearEmbedder()                 # loads google/hear-pytorch
+    embedder = HearEmbedder()  # loads google/hear-pytorch
     vectors, metadata = embed_file("cough.wav", embedder, overlap=0.5)
     # vectors: (n_windows, 512) float32; metadata[i] locates window i in time.
 """
