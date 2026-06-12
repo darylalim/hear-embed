@@ -17,31 +17,46 @@ vectors plus their time offsets to disk.
 
 ## Install
 
+This project uses [uv](https://docs.astral.sh/uv/). One command creates the
+virtual environment, installs the dependencies (plus the `dev` group), and
+writes/checks `uv.lock`:
+
 ```bash
-pip install -e .          # or: pip install -e ".[dev]" for the tests
+uv sync          # then prefix commands with `uv run`
 ```
 
-Requires Python ≥ 3.10. `soundfile` needs the system `libsndfile` library
+Without uv, a plain editable install also works:
+
+```bash
+pip install -e . pytest    # pytest only needed for the test suite
+```
+
+Requires Python ≥ 3.10 (the repo pins 3.11 via `.python-version`; `uv` will
+fetch it if missing). `soundfile` needs the system `libsndfile` library
 (`brew install libsndfile` on macOS; usually preinstalled on Linux).
+
+> On macOS, `uv sync` resolves the CPU/Metal `torch` wheels from PyPI with no
+> extra config. For Linux/GPU or a portable lockfile, configure the torch index
+> per uv's [PyTorch guide](https://docs.astral.sh/uv/guides/integration/pytorch/).
 
 ### Authenticate (the model is gated)
 
 `google/hear-pytorch` is gated under the Health AI Developer Foundations terms:
 
 1. Accept the terms at <https://huggingface.co/google/hear-pytorch>.
-2. `huggingface-cli login` (or export `HF_TOKEN=...`).
+2. `uv run huggingface-cli login` (or export `HF_TOKEN=...`).
 
 ## CLI
 
 ```bash
 # Embed every recording in a folder, 50% window overlap, to Parquet:
-hear-embed ./recordings --overlap 0.5 --out embeddings.parquet
+uv run hear-embed ./recordings --overlap 0.5 --out embeddings.parquet
 
 # One averaged vector per file instead of one per window:
-hear-embed ./recordings --pool mean --out file_embeddings.parquet
+uv run hear-embed ./recordings --pool mean --out file_embeddings.parquet
 
 # A single file, NumPy output (writes embeddings.npy + embeddings.csv):
-hear-embed cough.wav --format npz --out embeddings
+uv run hear-embed cough.wav --format npz --out embeddings
 ```
 
 Key flags: `--overlap` (0–1 window overlap), `--pool` (`none` per-window /
@@ -96,9 +111,9 @@ The preprocessing in `hear_pipeline/_vendor/audio_utils.py` is vendored
 ## Tests
 
 ```bash
-pytest                 # windowing tests run with only numpy installed
-pytest -m "not model"  # everything except the heavy model smoke test
-pytest -m model        # load the real model + one forward pass (see below)
+uv run pytest                 # windowing tests + auto-skipped model smoke test
+uv run pytest -m "not model"  # everything except the heavy model smoke test
+uv run pytest -m model        # load the real model + one forward pass (see below)
 ```
 
 `tests/test_model_smoke.py` loads the real `google/hear-pytorch` and runs a
