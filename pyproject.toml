@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hear-pipeline"
+version = "0.1.0"
+description = "Embed health-acoustic recordings with the Google HeAR model."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "soundfile>=0.12",
+    "torch>=2.1",
+    # Pinned: google/hear-pytorch is exported against this transformers release.
+    "transformers==4.50.3",
+    "pyarrow>=14",
+    "huggingface-hub>=0.23",
+    "tqdm>=4.66",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+hear-embed = "hear_pipeline.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hear_pipeline"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "model: requires the gated HeAR model + torch/transformers (deselect with -m 'not model')",
+]
