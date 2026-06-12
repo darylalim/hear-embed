@@ -26,6 +26,7 @@ hear-embed = "hear_pipeline.cli:main"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.6.0",
     "pytest>=8",
     "ruff>=0.15.17",
 ]
