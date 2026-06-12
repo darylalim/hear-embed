@@ -22,3 +22,8 @@ embeddings.csv
 
 # OS
 .DS_Store
+
+# Secrets / local environment — never commit real tokens
+.env
+.env.*
+!.env.example
