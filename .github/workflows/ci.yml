@@ -19,20 +19,42 @@ jobs:
         with:
           enable-cache: true
 
-      # --no-group model skips torch+transformers (a multi-GB install) since
-      # nothing CI runs needs them: ruff is standalone and the non-model tests
-      # are numpy-only. --locked still asserts the committed lockfile is current.
-      # Uses the Python pinned in .python-version.
+      # --no-group model skips torch+transformers since nothing this job runs
+      # needs them: ruff is standalone and the non-model tests are numpy-only.
+      # --locked still asserts the committed lockfile is current. Uses the
+      # Python pinned in .python-version. The `uv run`s below pass --no-sync
+      # because a bare `uv run` re-syncs the default groups — quietly
+      # re-installing the model group this step just skipped.
       - name: Install dependencies
         run: uv sync --locked --no-group model
 
       - name: Ruff lint
-        run: uv run ruff check
+        run: uv run --no-sync ruff check
 
       - name: Ruff format check
-        run: uv run ruff format --check
+        run: uv run --no-sync ruff format --check
 
       # The `model`-marked smoke test needs the gated HeAR model + an HF token,
       # which CI doesn't have, so it's excluded here.
       - name: Tests
-        run: uv run pytest -m "not model"
+        run: uv run --no-sync pytest -m "not model"
+
+  # Separate from lint-and-test because ty needs torch/transformers importable
+  # to check embedder.py, so this job installs the model group too. On Linux
+  # that resolves CPU-only torch via the pytorch-cpu index in pyproject.toml
+  # (hundreds of MB, cached by setup-uv) rather than the multi-GB CUDA build.
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies (incl. model group)
+        run: uv sync --locked
+
+      - name: ty type check
+        run: uv run --no-sync ty check

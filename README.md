@@ -40,9 +40,14 @@ Requires Python ≥ 3.10 (the repo pins 3.11 via `.python-version`; `uv` will
 fetch it if missing). `soundfile` needs the system `libsndfile` library
 (`brew install libsndfile` on macOS; usually preinstalled on Linux).
 
-> On macOS, `uv sync` resolves the CPU/Metal `torch` wheels from PyPI with no
-> extra config. For Linux/GPU or a portable lockfile, configure the torch index
-> per uv's [PyTorch guide](https://docs.astral.sh/uv/guides/integration/pytorch/).
+> With uv, torch resolution is platform-aware: macOS gets the CPU/Metal wheels
+> from PyPI, while Linux gets CPU-only wheels from the PyTorch CPU index
+> configured under `[tool.uv]` in `pyproject.toml` (so CI avoids the multi-GB
+> CUDA build); for CUDA on Linux, swap that index per uv's
+> [PyTorch guide](https://docs.astral.sh/uv/guides/integration/pytorch/).
+> pip ignores `[tool.uv]`, so the pip fallback above pulls PyPI's default
+> torch — the CUDA build on Linux. Add
+> `--index-url https://download.pytorch.org/whl/cpu` there for CPU-only.
 
 ### Authenticate (the model is gated)
 
@@ -137,9 +142,11 @@ uv run pre-commit install  # run ruff + ty automatically on every commit
 ```
 
 `ty` is Astral's Rust type checker. It is **pre-1.0 (preview)**, so its exact
-version is pinned via `uv.lock` and behavior may shift between releases. It runs
-locally and in pre-commit — where the `model` group (torch/transformers) is
-installed so it can resolve those imports — rather than in the lean CI job.
+version is pinned via `uv.lock` and behavior may shift between releases. It
+runs in pre-commit and in CI's `typecheck` job; both install the `model` group
+(torch/transformers) so ty can resolve those imports. CI gets CPU-only torch
+wheels (see the install note above), keeping the job a few hundred MB instead
+of multi-GB.
 
 ## License
 

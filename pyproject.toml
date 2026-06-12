@@ -12,7 +12,7 @@ license = "Apache-2.0"
 # The audio/IO pipeline (loading, windowing, writing) needs only these. The
 # HeAR encoder's heavy deps (torch, transformers) live in the `model` group
 # below — installed by default locally, skippable in CI — so lint + the
-# numpy-only logic tests don't drag in a multi-GB torch install.
+# numpy-only logic tests don't drag in a torch install.
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
@@ -42,8 +42,21 @@ model = [
 
 [tool.uv]
 # Install both groups by default locally, so `uv sync` still gives a working
-# embedder. CI overrides this with `--no-group model`.
+# embedder. CI's lint-and-test job overrides this with `--no-group model`.
 default-groups = ["dev", "model"]
+
+# On Linux, PyPI's default torch is the CUDA build plus several GB of nvidia-*
+# deps, which CI's typecheck job doesn't need just to give ty an importable
+# torch. Resolve Linux torch from the PyTorch CPU index instead; macOS keeps
+# PyPI's CPU/Metal wheels. For CUDA on Linux, swap this index per uv's PyTorch
+# guide: https://docs.astral.sh/uv/guides/integration/pytorch/
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [tool.hatch.build.targets.wheel]
 packages = ["hear_pipeline"]
