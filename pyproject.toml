@@ -9,13 +9,14 @@ description = "Embed health-acoustic recordings with the Google HeAR model."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
+# The audio/IO pipeline (loading, windowing, writing) needs only these. The
+# HeAR encoder's heavy deps (torch, transformers) live in the `model` group
+# below — installed by default locally, skippable in CI — so lint + the
+# numpy-only logic tests don't drag in a multi-GB torch install.
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",
     "soundfile>=0.12",
-    "torch>=2.1",
-    # Pinned: google/hear-pytorch is exported against this transformers release.
-    "transformers==4.50.3",
     "pyarrow>=14",
     "huggingface-hub>=0.23",
     "tqdm>=4.66",
@@ -30,6 +31,18 @@ dev = [
     "pytest>=8",
     "ruff>=0.15.17",
 ]
+# The HeAR encoder's runtime deps. Split into a group so CI can skip them with
+# `uv sync --no-group model`. transformers is pinned: google/hear-pytorch is
+# exported against this release.
+model = [
+    "torch>=2.1",
+    "transformers==4.50.3",
+]
+
+[tool.uv]
+# Install both groups by default locally, so `uv sync` still gives a working
+# embedder. CI overrides this with `--no-group model`.
+default-groups = ["dev", "model"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["hear_pipeline"]

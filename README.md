@@ -18,17 +18,22 @@ vectors plus their time offsets to disk.
 ## Install
 
 This project uses [uv](https://docs.astral.sh/uv/). One command creates the
-virtual environment, installs the dependencies (plus the `dev` group), and
-writes/checks `uv.lock`:
+virtual environment and installs everything — the core deps plus the `dev` and
+`model` dependency groups (both on by default) — and writes/checks `uv.lock`:
 
 ```bash
 uv sync          # then prefix commands with `uv run`
 ```
 
-Without uv, a plain editable install also works:
+The HeAR encoder's heavy deps (`torch`, `transformers`) live in a separate
+`model` group so CI can skip them (`uv sync --no-group model`); `uv sync`
+installs them by default for local use.
+
+Without uv, a plain editable install must add the model deps explicitly, since
+pip does not install dependency groups:
 
 ```bash
-pip install -e . pytest    # pytest only needed for the test suite
+pip install -e . "torch>=2.1" "transformers==4.50.3" pytest
 ```
 
 Requires Python ≥ 3.10 (the repo pins 3.11 via `.python-version`; `uv` will

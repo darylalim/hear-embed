@@ -341,9 +341,7 @@ dependencies = [
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "soundfile" },
-    { name = "torch" },
     { name = "tqdm" },
-    { name = "transformers" },
 ]
 
 [package.dev-dependencies]
@@ -351,6 +349,10 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
+]
+model = [
+    { name = "torch" },
+    { name = "transformers" },
 ]
 
 [package.metadata]
@@ -360,9 +362,7 @@ requires-dist = [
     { name = "pyarrow", specifier = ">=14" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "soundfile", specifier = ">=0.12" },
-    { name = "torch", specifier = ">=2.1" },
     { name = "tqdm", specifier = ">=4.66" },
-    { name = "transformers", specifier = "==4.50.3" },
 ]
 
 [package.metadata.requires-dev]
@@ -370,6 +370,10 @@ dev = [
     { name = "pre-commit", specifier = ">=4.6.0" },
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.15.17" },
+]
+model = [
+    { name = "torch", specifier = ">=2.1" },
+    { name = "transformers", specifier = "==4.50.3" },
 ]
 
 [[package]]

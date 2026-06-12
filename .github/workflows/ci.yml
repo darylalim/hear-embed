@@ -19,11 +19,12 @@ jobs:
         with:
           enable-cache: true
 
-      # Installs the locked deps (incl. the project) into a fresh .venv.
-      # Uses the Python pinned in .python-version. --locked fails if uv.lock
-      # is stale, asserting the committed lockfile is reproducible.
+      # --no-group model skips torch+transformers (a multi-GB install) since
+      # nothing CI runs needs them: ruff is standalone and the non-model tests
+      # are numpy-only. --locked still asserts the committed lockfile is current.
+      # Uses the Python pinned in .python-version.
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --no-group model
 
       - name: Ruff lint
         run: uv run ruff check
