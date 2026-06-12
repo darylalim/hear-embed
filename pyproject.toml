@@ -50,6 +50,8 @@ packages = ["hear_pipeline"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Fail on any unregistered marker (catches typos instead of silently never matching).
+addopts = ["--strict-markers"]
 markers = [
     "model: requires the gated HeAR model + torch/transformers (deselect with -m 'not model')",
 ]
