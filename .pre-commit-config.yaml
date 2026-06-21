@@ -3,7 +3,7 @@
 # hear_embed/_vendor (Google's vendored audio_utils.py is never touched).
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.17
+    rev: v0.15.18
     hooks:
       - id: ruff-check
         args: [--fix]
