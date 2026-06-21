@@ -12,7 +12,7 @@ license = "Apache-2.0"
 # The audio/IO pipeline (loading, windowing, writing) needs only these. The
 # HeAR encoder's heavy deps (torch, transformers) live in the `model` group
 # below — installed by default locally, skippable in CI — so lint + the
-# numpy-only logic tests don't drag in a torch install.
+# torch-free logic tests don't drag in a torch install.
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",

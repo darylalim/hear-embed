@@ -121,10 +121,14 @@ The preprocessing in `hear_embed/_vendor/audio_utils.py` is vendored
 ## Tests
 
 ```bash
-uv run pytest                 # windowing tests + auto-skipped model smoke test
+uv run pytest                 # torch-free tests + auto-skipped model smoke test
 uv run pytest -m "not model"  # everything except the heavy model smoke test
 uv run pytest -m model        # load the real model + one forward pass (see below)
 ```
+
+The bulk of the suite is **torch-free** — loading/resampling, windowing,
+writers, pipeline pooling, and the CLI all run without the model or a GPU (a
+fake embedder stands in), so they make up CI's `-m "not model"` job.
 
 `tests/test_model_smoke.py` loads the real `google/hear-pytorch` and runs a
 forward pass, so CI can catch model load / inference breakage. It **skips

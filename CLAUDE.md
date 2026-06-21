@@ -14,7 +14,7 @@ When working with Python, invoke the relevant `/astral:<skill>` skill — `/astr
 
 ```bash
 uv sync                          # full local env (dev tools + torch/transformers)
-uv sync --no-group model         # core + dev only; enough for lint + numpy-only tests
+uv sync --no-group model         # core + dev only; enough for lint + the torch-free tests
 
 uv run pytest                    # all tests (model smoke test auto-skips without deps/access)
 uv run pytest -m "not model"     # everything except the heavy model smoke test
@@ -35,7 +35,7 @@ uv run pre-commit install        # run ruff + ty on every commit
 The single most important design decision, and it shapes everything else: the **audio/IO/windowing layer never imports torch**. All heavy or optional dependencies (`torch`, `transformers`, `soundfile`, `scipy`, `pyarrow`, `tqdm`) are imported **lazily inside functions/methods**, never at module top level. Consequences to preserve when editing:
 
 - `torch` + `transformers` live in a separate `model` dependency group, so `uv sync --no-group model` (and CI's lint/test job) gives a working install of everything except the encoder.
-- The windowing/loading logic (`audio.py`) is unit-testable and lintable with only numpy present. `tests/test_audio.py` is pure numpy and runs in CI without the model.
+- Everything except the encoder is testable without the model: `tests/test_audio.py` (pure-numpy windowing), `test_audio_io.py` (loading/resampling), `test_writers.py` (Parquet/npz), `test_pipeline.py` (pooling), and `test_cli.py` (exit codes) all run in CI's `-m "not model"` job — the last two use a fake/monkeypatched embedder, so no torch is needed. Only `test_model_smoke.py` loads the real model.
 - **Do not add top-level `import torch` / `import transformers` / etc. to the audio or IO modules.** Match the existing lazy-import pattern instead.
 
 ### Data flow
@@ -62,7 +62,7 @@ load_and_resample ─→ window_audio ─→ HearEmbedder.embed_clips ─→ wri
 
 ## CI / tooling notes
 
-- Two jobs: **lint-and-test** runs `uv sync --locked --no-group model` (numpy-only tests + ruff, no torch); **typecheck** runs `uv sync --locked` *with* the model group because `ty` needs torch/transformers importable to check `embedder.py`. On Linux, `[tool.uv]` in `pyproject.toml` resolves CPU-only torch from the `pytorch-cpu` index (hundreds of MB) instead of the multi-GB CUDA build.
+- Two jobs: **lint-and-test** runs `uv sync --locked --no-group model` (torch-free tests + ruff, no torch); **typecheck** runs `uv sync --locked` *with* the model group because `ty` needs torch/transformers importable to check `embedder.py`. On Linux, `[tool.uv]` in `pyproject.toml` resolves CPU-only torch from the `pytorch-cpu` index (hundreds of MB) instead of the multi-GB CUDA build.
 - CI's `uv run` steps pass **`--no-sync`** on purpose: a bare `uv run` re-syncs the default groups and would quietly reinstall the `model` group a job just chose to skip. If you add CI steps, keep `--no-sync` after the initial `uv sync`.
 - `pytest` runs with `--strict-markers`; the only registered marker is `model`. Register any new marker in `[tool.pytest.ini_options]` or it will error.
 - Targets Python ≥ 3.10 (`.python-version` pins 3.11 locally; `ty` checks against 3.10). Ruff lint set: `E, F, I, UP, B, SIM`.
