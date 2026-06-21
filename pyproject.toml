@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "hear-pipeline"
+name = "hear-embed"
 version = "0.1.0"
 description = "Embed health-acoustic recordings with the Google HeAR model."
 readme = "README.md"
@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.scripts]
-hear-embed = "hear_pipeline.cli:main"
+hear-embed = "hear_embed.cli:main"
 
 [dependency-groups]
 dev = [
@@ -59,7 +59,7 @@ explicit = true
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 
 [tool.hatch.build.targets.wheel]
-packages = ["hear_pipeline"]
+packages = ["hear_embed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -73,7 +73,7 @@ markers = [
 target-version = "py310"
 # Google's audio_utils.py is vendored unmodified — never lint/reformat it.
 # force-exclude keeps it excluded even when paths are passed explicitly (pre-commit/CI).
-extend-exclude = ["hear_pipeline/_vendor"]
+extend-exclude = ["hear_embed/_vendor"]
 force-exclude = true
 
 [tool.ruff.lint]
@@ -88,4 +88,4 @@ python-version = "3.10"
 
 [tool.ty.src]
 # Don't type-check Google's vendored audio_utils.py (kept unmodified upstream).
-exclude = ["hear_pipeline/_vendor"]
+exclude = ["hear_embed/_vendor"]

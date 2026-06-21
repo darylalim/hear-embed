@@ -1,4 +1,4 @@
-# hear-pipeline
+# hear-embed
 
 Generate embeddings for health-acoustic recordings with the Google
 [HeAR](https://huggingface.co/google/hear-pytorch) model.
@@ -79,7 +79,7 @@ a large corpus never holds all vectors in memory.
 ## Library
 
 ```python
-from hear_pipeline import HearEmbedder, embed_file, window_audio
+from hear_embed import HearEmbedder, embed_file, window_audio
 
 embedder = HearEmbedder()  # loads google/hear-pytorch onto GPU if available
 
@@ -114,7 +114,7 @@ vecs = embedder.embed_clips(clips)                                # (n, 512)
 3. **Embed** (`embedder.HearEmbedder`) — apply HeAR's mel-PCEN preprocessing and
    run the PyTorch encoder, taking `pooler_output` as the 512-dim vector.
 
-The preprocessing in `hear_pipeline/_vendor/audio_utils.py` is vendored
+The preprocessing in `hear_embed/_vendor/audio_utils.py` is vendored
 **unmodified** from [`Google-Health/hear`](https://github.com/Google-Health/hear)
 (Apache-2.0) so it matches Google's reference exactly.
 

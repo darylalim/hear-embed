@@ -1,8 +1,8 @@
-"""hear-pipeline: embed health-acoustic recordings with Google HeAR.
+"""hear-embed: embed health-acoustic recordings with Google HeAR.
 
 Typical library use::
 
-    from hear_pipeline import HearEmbedder, embed_file
+    from hear_embed import HearEmbedder, embed_file
 
     embedder = HearEmbedder()  # loads google/hear-pytorch
     vectors, metadata = embed_file("cough.wav", embedder, overlap=0.5)

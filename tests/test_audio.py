@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from hear_pipeline.audio import CLIP_LENGTH, window_audio
+from hear_embed.audio import CLIP_LENGTH, window_audio
 
 
 @pytest.mark.parametrize(

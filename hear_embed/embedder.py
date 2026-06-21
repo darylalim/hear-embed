@@ -36,7 +36,7 @@ class HearEmbedder:
         """Embeds ``(n, 32000)`` clips into an ``(n, 512)`` float32 array.
 
         Each clip must be exactly 32,000 samples (2 s at 16 kHz); use
-        :func:`hear_pipeline.audio.window_audio` to produce them. Preprocessing
+        :func:`hear_embed.audio.window_audio` to produce them. Preprocessing
         (mel-PCEN spectrogram) runs on-device via the vendored ``preprocess_audio``.
         """
         from ._vendor.audio_utils import preprocess_audio

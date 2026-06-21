@@ -1,6 +1,6 @@
 # Ruff lint + format on commit. Activate once with:  uv run pre-commit install
 # Hooks honor [tool.ruff] in pyproject.toml, including the force-excluded
-# hear_pipeline/_vendor (Google's vendored audio_utils.py is never touched).
+# hear_embed/_vendor (Google's vendored audio_utils.py is never touched).
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.17

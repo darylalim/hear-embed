@@ -20,8 +20,8 @@ import importlib.util
 import numpy as np
 import pytest
 
-from hear_pipeline.audio import CLIP_LENGTH
-from hear_pipeline.embedder import DEFAULT_MODEL_ID, EMBEDDING_DIM
+from hear_embed.audio import CLIP_LENGTH
+from hear_embed.embedder import DEFAULT_MODEL_ID, EMBEDDING_DIM
 
 
 def _missing_deps() -> list[str]:
@@ -64,7 +64,7 @@ pytestmark = [
 @pytest.fixture(scope="module")
 def embedder():
     """Load the model once on CPU (deterministic, no-GPU-CI safe)."""
-    from hear_pipeline.embedder import HearEmbedder
+    from hear_embed.embedder import HearEmbedder
 
     return HearEmbedder(device="cpu")
 
@@ -81,7 +81,7 @@ def test_embed_clips_returns_512d_finite(embedder):
 def test_embed_file_end_to_end_and_deterministic(embedder, tmp_path):
     import soundfile as sf
 
-    from hear_pipeline.pipeline import embed_file
+    from hear_embed.pipeline import embed_file
 
     sr = 16_000
     audio = (np.random.default_rng(1).standard_normal(3 * sr) * 0.1).astype(np.float32)
