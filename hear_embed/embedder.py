@@ -2,10 +2,23 @@
 
 from __future__ import annotations
 
+from typing import Protocol
+
 import numpy as np
 
 EMBEDDING_DIM = 512
 DEFAULT_MODEL_ID = "google/hear-pytorch"
+
+
+class Embedder(Protocol):
+    """Structural type for whatever ``embed_file`` drives: just ``embed_clips``.
+
+    :class:`HearEmbedder` satisfies this, but so does any object exposing the
+    same method — a test fake or an alternate backbone — without subclassing it
+    (and so without inheriting its torch-loading ``__init__``).
+    """
+
+    def embed_clips(self, clips: np.ndarray, batch_size: int = 64) -> np.ndarray: ...
 
 
 class HearEmbedder:

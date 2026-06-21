@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 
 from .audio import CLIP_LENGTH, SAMPLE_RATE, load_and_resample, window_audio
-from .embedder import EMBEDDING_DIM, HearEmbedder
+from .embedder import EMBEDDING_DIM, Embedder
 
 
 @dataclass(frozen=True)
@@ -24,7 +24,7 @@ class ClipMetadata:
 
 def embed_file(
     path: str | Path,
-    embedder: HearEmbedder,
+    embedder: Embedder,
     overlap: float = 0.0,
     batch_size: int = 64,
     pool: str = "none",
@@ -33,7 +33,8 @@ def embed_file(
 
     Args:
         path: Audio file (any length).
-        embedder: A loaded :class:`HearEmbedder`.
+        embedder: Any object satisfying :class:`~hear_embed.embedder.Embedder`
+            (e.g. a loaded :class:`~hear_embed.embedder.HearEmbedder`).
         overlap: Fractional overlap between consecutive 2-second windows.
         batch_size: Clips per model forward pass.
         pool: ``"none"`` for one embedding per window, or ``"mean"`` to average
