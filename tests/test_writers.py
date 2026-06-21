@@ -1,0 +1,261 @@
+"""Unit tests for output writers — torch-free, no model/HearEmbedder needed.
+
+Exercises ``ParquetEmbeddingWriter``, ``NpzEmbeddingWriter`` and ``make_writer``
+using hand-built ``ClipMetadata`` lists and fake ``(n, 512)`` float32 vectors.
+Nothing here imports torch/transformers or loads a model — only the pure-Python
+serialization paths are tested. A tiny ``FakeEmbedder`` stands in for the real
+embedder's ``embed_clips`` signature to underline that no real model is used.
+"""
+
+from __future__ import annotations
+
+import csv
+from pathlib import Path
+
+import numpy as np
+import pyarrow.parquet as pq
+import pytest
+
+from hear_embed.pipeline import ClipMetadata
+from hear_embed.writers import (
+    NpzEmbeddingWriter,
+    ParquetEmbeddingWriter,
+    make_writer,
+)
+
+EMBEDDING_DIM = 512
+
+PARQUET_COLUMNS = [
+    "source_file",
+    "clip_index",
+    "start_sample",
+    "start_sec",
+    "end_sec",
+    "embedding",
+]
+CSV_HEADER = [
+    "row",
+    "source_file",
+    "clip_index",
+    "start_sample",
+    "start_sec",
+    "end_sec",
+]
+
+
+class FakeEmbedder:
+    """Stand-in matching ``HearEmbedder.embed_clips`` — no torch, no model.
+
+    Returns deterministic, distinguishable rows so round-tripped values can be
+    checked exactly. Present mainly to assert the writers never need a real
+    model: tests only ever touch ``embed_clips`` output, not the encoder.
+    """
+
+    def embed_clips(self, clips: np.ndarray, batch_size: int = 64) -> np.ndarray:
+        n = len(clips)
+        # Row i is all-(i) so each embedding is trivially identifiable.
+        return np.arange(n, dtype=np.float32).reshape(n, 1) * np.ones(
+            (1, EMBEDDING_DIM), dtype=np.float32
+        )
+
+
+def _vectors(n: int, *, seed: int = 0) -> np.ndarray:
+    """An ``(n, 512)`` float32 vector array with reproducible contents."""
+    rng = np.random.default_rng(seed)
+    return rng.standard_normal((n, EMBEDDING_DIM)).astype(np.float32)
+
+
+def _metadata(n: int, *, source: str = "rec.wav") -> list[ClipMetadata]:
+    """``n`` ClipMetadata rows with distinct, predictable field values."""
+    return [
+        ClipMetadata(
+            source_file=source,
+            clip_index=i,
+            start_sample=i * 16000,
+            start_sec=float(i),
+            end_sec=float(i) + 2.0,
+        )
+        for i in range(n)
+    ]
+
+
+# --------------------------------------------------------------------------- #
+# ParquetEmbeddingWriter
+# --------------------------------------------------------------------------- #
+
+
+def test_parquet_writes_expected_schema_and_roundtrips(tmp_path: Path) -> None:
+    path = tmp_path / "out.parquet"
+    vectors = _vectors(3)
+    metadata = _metadata(3)
+
+    with ParquetEmbeddingWriter(path) as writer:
+        writer.write(vectors, metadata)
+        assert writer.rows_written == 3
+
+    table = pq.read_table(path)
+    assert table.num_rows == 3
+    # Column order/names must match the documented public schema exactly.
+    assert table.column_names == PARQUET_COLUMNS
+
+    embeddings = table.column("embedding").to_pylist()
+    # Every embedding round-trips as a length-512 list of floats.
+    assert all(len(e) == EMBEDDING_DIM for e in embeddings)
+
+    # Metadata scalar columns round-trip by value (and order is preserved).
+    assert table.column("clip_index").to_pylist() == [0, 1, 2]
+    assert table.column("start_sec").to_pylist() == [0.0, 1.0, 2.0]
+    assert table.column("source_file").to_pylist() == ["rec.wav"] * 3
+
+    # Embedding values themselves survive the float32 round trip.
+    np.testing.assert_array_equal(np.asarray(embeddings, dtype=np.float32), vectors)
+
+
+def test_parquet_streaming_two_writes_accumulate_rows(tmp_path: Path) -> None:
+    path = tmp_path / "stream.parquet"
+
+    with ParquetEmbeddingWriter(path) as writer:
+        writer.write(_vectors(2, seed=1), _metadata(2))
+        assert writer.rows_written == 2
+        writer.write(_vectors(3, seed=2), _metadata(3, source="other.wav"))
+        # rows_written accumulates across streaming write() calls.
+        assert writer.rows_written == 5
+
+    pf = pq.ParquetFile(path)
+    # One row group per write() call — streaming, not a single buffered table.
+    assert pf.num_row_groups == 2
+    assert pf.metadata.num_rows == 5
+
+    table = pf.read()
+    assert table.num_rows == 5
+    assert (
+        table.column("source_file").to_pylist() == ["rec.wav"] * 2 + ["other.wav"] * 3
+    )
+
+
+def test_parquet_empty_write_is_noop(tmp_path: Path) -> None:
+    path = tmp_path / "empty.parquet"
+
+    with ParquetEmbeddingWriter(path) as writer:
+        writer.write(np.empty((0, EMBEDDING_DIM), dtype=np.float32), [])
+        # Zero-length metadata is a no-op: nothing counted.
+        assert writer.rows_written == 0
+
+    table = pq.read_table(path)
+    assert table.num_rows == 0
+    # Even an empty file still carries the full schema.
+    assert table.column_names == PARQUET_COLUMNS
+
+
+def test_parquet_fakeembedder_vectors_roundtrip(tmp_path: Path) -> None:
+    # Demonstrates writers operate purely on embed_clips output (no real model).
+    path = tmp_path / "fake.parquet"
+    embedder = FakeEmbedder()
+    clips = np.zeros((4, 32000), dtype=np.float32)  # CLIP_LENGTH-shaped, unused values
+    vectors = embedder.embed_clips(clips)
+    assert vectors.shape == (4, EMBEDDING_DIM)
+
+    with ParquetEmbeddingWriter(path) as writer:
+        writer.write(vectors, _metadata(4))
+
+    table = pq.read_table(path)
+    got = np.asarray(table.column("embedding").to_pylist(), dtype=np.float32)
+    # FakeEmbedder row i is all-i; confirm those identifiable rows survive.
+    np.testing.assert_array_equal(got, vectors)
+
+
+# --------------------------------------------------------------------------- #
+# NpzEmbeddingWriter
+# --------------------------------------------------------------------------- #
+
+
+def test_npz_writes_npy_and_csv(tmp_path: Path) -> None:
+    path = tmp_path / "bundle"  # writer derives .npy / .csv from the stem
+    vectors = _vectors(3)
+    metadata = _metadata(3)
+
+    with NpzEmbeddingWriter(path) as writer:
+        writer.write(vectors, metadata)
+        assert writer.rows_written == 3
+
+    npy_path = path.with_suffix(".npy")
+    csv_path = path.with_suffix(".csv")
+    assert npy_path.exists() and csv_path.exists()
+
+    stacked = np.load(npy_path)
+    assert stacked.shape == (3, EMBEDDING_DIM)
+    assert stacked.dtype == np.float32
+    np.testing.assert_array_equal(stacked, vectors)
+
+    with open(csv_path, newline="") as f:
+        rows = list(csv.reader(f))
+    assert rows[0] == CSV_HEADER  # header line
+    assert len(rows) == 1 + 3  # header + one row per metadata
+    # Row contents round-trip (CSV values are strings).
+    assert rows[1] == ["0", "rec.wav", "0", "0", "0.0", "2.0"]
+    assert rows[2] == ["1", "rec.wav", "1", "16000", "1.0", "3.0"]
+    assert rows[3] == ["2", "rec.wav", "2", "32000", "2.0", "4.0"]
+
+
+def test_npz_streaming_two_writes_concatenate(tmp_path: Path) -> None:
+    path = tmp_path / "multi"
+    v1 = _vectors(2, seed=1)
+    v2 = _vectors(3, seed=2)
+
+    with NpzEmbeddingWriter(path) as writer:
+        writer.write(v1, _metadata(2))
+        writer.write(v2, _metadata(3, source="b.wav"))
+        assert writer.rows_written == 5
+
+    stacked = np.load(path.with_suffix(".npy"))
+    assert stacked.shape == (5, EMBEDDING_DIM)
+    # Accumulated vectors are concatenated in write() order.
+    np.testing.assert_array_equal(stacked, np.concatenate([v1, v2], axis=0))
+
+    with open(path.with_suffix(".csv"), newline="") as f:
+        rows = list(csv.reader(f))
+    assert len(rows) == 1 + 5
+    # The "row" column is a global 0..n-1 index across both write() batches.
+    assert [r[0] for r in rows[1:]] == ["0", "1", "2", "3", "4"]
+    assert [r[1] for r in rows[1:]] == ["rec.wav", "rec.wav", "b.wav", "b.wav", "b.wav"]
+
+
+def test_npz_empty_write_is_noop(tmp_path: Path) -> None:
+    path = tmp_path / "nothing"
+
+    with NpzEmbeddingWriter(path) as writer:
+        writer.write(np.empty((0, EMBEDDING_DIM), dtype=np.float32), [])
+        assert writer.rows_written == 0
+
+    stacked = np.load(path.with_suffix(".npy"))
+    # Empty run still emits an (0, 512) float32 array and a header-only CSV.
+    assert stacked.shape == (0, EMBEDDING_DIM)
+    assert stacked.dtype == np.float32
+
+    with open(path.with_suffix(".csv"), newline="") as f:
+        rows = list(csv.reader(f))
+    assert rows == [CSV_HEADER]
+
+
+# --------------------------------------------------------------------------- #
+# make_writer
+# --------------------------------------------------------------------------- #
+
+
+def test_make_writer_parquet(tmp_path: Path) -> None:
+    writer = make_writer(tmp_path / "a.parquet", "parquet")
+    try:
+        assert isinstance(writer, ParquetEmbeddingWriter)
+    finally:
+        writer.close()  # ParquetWriter must be closed to flush a valid file.
+
+
+def test_make_writer_npz(tmp_path: Path) -> None:
+    writer = make_writer(tmp_path / "a", "npz")
+    assert isinstance(writer, NpzEmbeddingWriter)
+    writer.close()
+
+
+def test_make_writer_unknown_format_raises(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="unknown format"):
+        make_writer(tmp_path / "a", "json")
