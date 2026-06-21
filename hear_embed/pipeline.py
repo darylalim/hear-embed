@@ -44,6 +44,11 @@ def embed_file(
         ``(vectors, metadata)`` with ``vectors`` shaped ``(n, 512)`` and one
         :class:`ClipMetadata` per row.
     """
+    # Validate up front so a bad pool fails fast, before loading/windowing the
+    # file and running a (potentially GPU) forward pass.
+    if pool not in ("none", "mean"):
+        raise ValueError(f"pool must be 'none' or 'mean', got {pool!r}")
+
     audio = load_and_resample(path)
     clips, offsets = window_audio(audio, overlap=overlap)
     vectors = embedder.embed_clips(clips, batch_size=batch_size)
@@ -65,9 +70,7 @@ def embed_file(
         ]
         return vectors, metadata
 
-    if pool != "none":
-        raise ValueError(f"pool must be 'none' or 'mean', got {pool!r}")
-
+    # pool == "none": one embedding per window.
     metadata = [
         ClipMetadata(
             source_file=str(path),

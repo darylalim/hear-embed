@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-import soundfile as sf
 
 from hear_embed.audio import CLIP_LENGTH, SAMPLE_RATE
 from hear_embed.embedder import EMBEDDING_DIM
@@ -95,10 +94,10 @@ def test_sub_clip_audio_yields_single_padded_window(tmp_path, fake_embedder, wri
     assert metadata[0].end_sec == CLIP_LENGTH / SAMPLE_RATE
 
 
-def test_empty_audio_pool_none_is_empty(tmp_path, fake_embedder):
+def test_empty_audio_pool_none_is_empty(tmp_path, fake_embedder, write_wav):
     # An empty recording produces no windows -> empty vectors and no metadata.
     wav = tmp_path / "empty.wav"
-    sf.write(wav, np.zeros(0, dtype=np.float32), SAMPLE_RATE)
+    write_wav(wav, 0)
 
     vectors, metadata = embed_file(wav, fake_embedder, pool="none")
 
@@ -106,10 +105,10 @@ def test_empty_audio_pool_none_is_empty(tmp_path, fake_embedder):
     assert metadata == []
 
 
-def test_empty_audio_pool_mean_is_zeros(tmp_path, fake_embedder):
+def test_empty_audio_pool_mean_is_zeros(tmp_path, fake_embedder, write_wav):
     # With no windows, mean-pooling falls back to a single zero vector spanning 0 s.
     wav = tmp_path / "empty.wav"
-    sf.write(wav, np.zeros(0, dtype=np.float32), SAMPLE_RATE)
+    write_wav(wav, 0)
 
     vectors, metadata = embed_file(wav, fake_embedder, pool="mean")
 

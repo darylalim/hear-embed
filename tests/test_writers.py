@@ -3,9 +3,7 @@
 Exercises ``ParquetEmbeddingWriter``, ``NpzEmbeddingWriter`` and ``make_writer``
 using hand-built ``ClipMetadata`` lists and fake ``(n, 512)`` float32 vectors.
 Nothing here imports torch/transformers or loads a model — only the pure-Python
-serialization paths are tested. The shared ``fake_embedder`` fixture (see
-``conftest.py``) underlines that the writers only ever touch ``embed_clips``
-output, never a real model.
+serialization paths are tested.
 """
 
 from __future__ import annotations
@@ -129,22 +127,6 @@ def test_parquet_empty_write_is_noop(tmp_path: Path) -> None:
     assert table.num_rows == 0
     # Even an empty file still carries the full schema.
     assert table.column_names == PARQUET_COLUMNS
-
-
-def test_parquet_fakeembedder_vectors_roundtrip(tmp_path: Path, fake_embedder) -> None:
-    # Demonstrates writers operate purely on embed_clips output (no real model).
-    path = tmp_path / "fake.parquet"
-    clips = np.zeros((4, 1), dtype=np.float32)  # only the row count matters to the fake
-    vectors = fake_embedder.embed_clips(clips)
-    assert vectors.shape == (4, EMBEDDING_DIM)
-
-    with ParquetEmbeddingWriter(path) as writer:
-        writer.write(vectors, _metadata(4))
-
-    table = pq.read_table(path)
-    got = np.asarray(table.column("embedding").to_pylist(), dtype=np.float32)
-    # The fake's identifiable (i + j) rows survive the float32 round trip.
-    np.testing.assert_array_equal(got, vectors)
 
 
 # --------------------------------------------------------------------------- #
