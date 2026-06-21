@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Uses [uv](https://docs.astral.sh/uv/). `uv sync` installs the `dev` + `model` groups by default (see dependency-group note below).
 
+When working with Python, invoke the relevant `/astral:<skill>` skill — `/astral:uv`, `/astral:ty`, `/astral:ruff` — for the corresponding tool to ensure best practices are followed.
+
 ```bash
 uv sync                          # full local env (dev tools + torch/transformers)
 uv sync --no-group model         # core + dev only; enough for lint + numpy-only tests
