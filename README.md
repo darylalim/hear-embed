@@ -69,7 +69,7 @@ uv run hear-embed ./recordings --pool mean --out file_embeddings.parquet
 uv run hear-embed cough.wav --format npz --out embeddings
 ```
 
-Key flags: `--overlap` (0–1 window overlap), `--pool` (`none` per-window /
+Key flags: `--overlap` (window overlap in `[0, 1)`), `--pool` (`none` per-window /
 `mean` per-file), `--batch-size`, `--device` (`cuda`/`cpu`), `--format`
 (`parquet`/`npz`), `--model`, `--extensions`.
 

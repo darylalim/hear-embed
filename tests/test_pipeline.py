@@ -24,9 +24,10 @@ class FakeEmbedder(HearEmbedder):
     ``HearEmbedder`` does not import torch (the real ``__init__`` imports it
     lazily), so this stays torch-free.
 
-    Row ``i`` of the output is filled with the constant ``i``, so the embeddings
-    encode their window order. That lets tests assert (a) that ``embed_file``
-    preserves row order against the metadata, and (b) the exact pooled mean.
+    Row ``i``, column ``j`` of the output is ``i + j`` — values vary along both
+    axes, so a wrong reduction axis (or a global mean) is detectable — while row
+    ``i`` still starts at ``i``. Tests assert (a) ``embed_file`` preserves row
+    order against the metadata, and (b) the exact per-column pooled mean.
     Mirrors the real embedder's empty-input contract: ``(0, 512)`` for no clips.
     """
 
@@ -38,8 +39,12 @@ class FakeEmbedder(HearEmbedder):
         if n == 0:
             # Match HearEmbedder.embed_clips: empty in -> empty (0, 512) out.
             return np.empty((0, EMBEDDING_DIM), dtype=np.float32)
-        # Each row is a constant equal to its index, broadcast across all 512 dims.
-        return np.tile(np.arange(n, dtype=np.float32)[:, None], (1, EMBEDDING_DIM))
+        # Row i, column j = i + j: values vary along BOTH axes, so a mean over
+        # the wrong axis (or a global mean) differs from the correct per-column
+        # mean — letting the pooling tests tell a correct reduction from a buggy one.
+        rows = np.arange(n, dtype=np.float32)[:, None]
+        cols = np.arange(EMBEDDING_DIM, dtype=np.float32)[None, :]
+        return rows + cols
 
 
 def _write_wav(path, n_samples: int) -> np.ndarray:
@@ -67,9 +72,10 @@ def test_pool_none_shapes_and_metadata(tmp_path):
     # clip_index runs 0..n-1 in order.
     assert [m.clip_index for m in metadata] == list(range(n_windows))
 
-    # FakeEmbedder encodes row order; embed_file must not reshuffle rows.
+    # FakeEmbedder row i is (i + arange(512)); embed_file must not reshuffle rows.
+    expected_cols = np.arange(EMBEDDING_DIM, dtype=np.float32)
     for i, m in enumerate(metadata):
-        assert np.all(vectors[i] == float(i))
+        assert np.array_equal(vectors[i], float(i) + expected_cols)
         # No-overlap offsets are exact multiples of CLIP_LENGTH.
         offset = i * CLIP_LENGTH
         assert m.start_sample == offset
@@ -82,7 +88,9 @@ def test_pool_mean_averages_windows_and_spans_file(tmp_path):
     wav = tmp_path / "clip.wav"
     audio = _write_wav(wav, 3 * SAMPLE_RATE)  # 2 windows.
 
-    # Per-window vectors that mean-pooling should collapse.
+    # Per-window fakes are [0..511] and [1..512]; mean-pooling collapses them to
+    # their column-wise mean [0.5, 1.5, ..., 511.5]. Because every column differs,
+    # a wrong reduction axis or a global mean would NOT match this expectation.
     clips = np.empty((2, CLIP_LENGTH), dtype=np.float32)
     per_window = FakeEmbedder().embed_clips(clips)
 
@@ -90,7 +98,7 @@ def test_pool_mean_averages_windows_and_spans_file(tmp_path):
 
     assert vectors.shape == (1, EMBEDDING_DIM)
     assert vectors.dtype == np.float32
-    # Pooled vector is the column-wise mean of the per-window fakes ([0, 1] -> 0.5).
+    # Pooled vector is the exact column-wise mean of the per-window fakes.
     np.testing.assert_array_equal(vectors, per_window.mean(axis=0, keepdims=True))
 
     # A single ClipMetadata spans the whole file.

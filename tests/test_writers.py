@@ -16,14 +16,13 @@ import numpy as np
 import pyarrow.parquet as pq
 import pytest
 
+from hear_embed.embedder import EMBEDDING_DIM
 from hear_embed.pipeline import ClipMetadata
 from hear_embed.writers import (
     NpzEmbeddingWriter,
     ParquetEmbeddingWriter,
     make_writer,
 )
-
-EMBEDDING_DIM = 512
 
 PARQUET_COLUMNS = [
     "source_file",
@@ -191,10 +190,13 @@ def test_npz_writes_npy_and_csv(tmp_path: Path) -> None:
         rows = list(csv.reader(f))
     assert rows[0] == CSV_HEADER  # header line
     assert len(rows) == 1 + 3  # header + one row per metadata
-    # Row contents round-trip (CSV values are strings).
-    assert rows[1] == ["0", "rec.wav", "0", "0", "0.0", "2.0"]
-    assert rows[2] == ["1", "rec.wav", "1", "16000", "1.0", "3.0"]
-    assert rows[3] == ["2", "rec.wav", "2", "32000", "2.0", "4.0"]
+    # Row contents round-trip. String/int columns are compared directly; the
+    # float start_sec/end_sec columns are parsed and compared numerically so the
+    # test pins the round-tripped VALUE, not str(float)'s incidental formatting.
+    for i, row in enumerate(rows[1:]):
+        assert row[:4] == [str(i), "rec.wav", str(i), str(i * 16000)]
+        assert float(row[4]) == float(i)  # start_sec
+        assert float(row[5]) == float(i) + 2.0  # end_sec
 
 
 def test_npz_streaming_two_writes_concatenate(tmp_path: Path) -> None:
@@ -217,6 +219,9 @@ def test_npz_streaming_two_writes_concatenate(tmp_path: Path) -> None:
     assert len(rows) == 1 + 5
     # The "row" column is a global 0..n-1 index across both write() batches.
     assert [r[0] for r in rows[1:]] == ["0", "1", "2", "3", "4"]
+    # clip_index is the PER-FILE index, so it restarts at 0 for the second batch
+    # ([0,1] then [0,1,2]) — distinct from the global "row" column above.
+    assert [r[2] for r in rows[1:]] == ["0", "1", "0", "1", "2"]
     assert [r[1] for r in rows[1:]] == ["rec.wav", "rec.wav", "b.wav", "b.wav", "b.wav"]
 
 

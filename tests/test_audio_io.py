@@ -63,10 +63,8 @@ def test_resampled_from_8k_to_16k_doubles_length(tmp_path: Path) -> None:
 
     out = load_and_resample(wav)
     assert out.dtype == np.float32
-    # 16 kHz / 8 kHz == 2x the source sample count (exact here, but allow rounding).
-    expected = int(round(src_count * (SAMPLE_RATE / src_rate)))
-    assert expected == 2 * src_count
-    assert out.shape[0] == expected
+    # 8 kHz -> 16 kHz doubles the sample count (4000 -> 8000).
+    assert out.shape[0] == 2 * src_count
 
 
 def test_int16_pcm_is_scaled_to_float_not_raw_integers(tmp_path: Path) -> None:
@@ -110,8 +108,7 @@ def test_iter_nested_tree_sorted_and_ignores_non_audio(tmp_path: Path) -> None:
     (tmp_path / "sub" / "data.json").write_text("{}")
 
     result = iter_audio_files(tmp_path)
-    assert result == sorted([a, b, c])  # only audio, returned sorted
-    assert result == sorted(result)  # explicitly sorted order
+    assert result == sorted([a, b, c])  # only audio, returned in sorted order
 
 
 def test_iter_honors_custom_extensions(tmp_path: Path) -> None:
