@@ -3,8 +3,9 @@
 Exercises ``ParquetEmbeddingWriter``, ``NpzEmbeddingWriter`` and ``make_writer``
 using hand-built ``ClipMetadata`` lists and fake ``(n, 512)`` float32 vectors.
 Nothing here imports torch/transformers or loads a model — only the pure-Python
-serialization paths are tested. A tiny ``FakeEmbedder`` stands in for the real
-embedder's ``embed_clips`` signature to underline that no real model is used.
+serialization paths are tested. The shared ``fake_embedder`` fixture (see
+``conftest.py``) underlines that the writers only ever touch ``embed_clips``
+output, never a real model.
 """
 
 from __future__ import annotations
@@ -40,22 +41,6 @@ CSV_HEADER = [
     "start_sec",
     "end_sec",
 ]
-
-
-class FakeEmbedder:
-    """Stand-in matching ``HearEmbedder.embed_clips`` — no torch, no model.
-
-    Returns deterministic, distinguishable rows so round-tripped values can be
-    checked exactly. Present mainly to assert the writers never need a real
-    model: tests only ever touch ``embed_clips`` output, not the encoder.
-    """
-
-    def embed_clips(self, clips: np.ndarray, batch_size: int = 64) -> np.ndarray:
-        n = len(clips)
-        # Row i is all-(i) so each embedding is trivially identifiable.
-        return np.arange(n, dtype=np.float32).reshape(n, 1) * np.ones(
-            (1, EMBEDDING_DIM), dtype=np.float32
-        )
 
 
 def _vectors(n: int, *, seed: int = 0) -> np.ndarray:
@@ -146,12 +131,11 @@ def test_parquet_empty_write_is_noop(tmp_path: Path) -> None:
     assert table.column_names == PARQUET_COLUMNS
 
 
-def test_parquet_fakeembedder_vectors_roundtrip(tmp_path: Path) -> None:
+def test_parquet_fakeembedder_vectors_roundtrip(tmp_path: Path, fake_embedder) -> None:
     # Demonstrates writers operate purely on embed_clips output (no real model).
     path = tmp_path / "fake.parquet"
-    embedder = FakeEmbedder()
-    clips = np.zeros((4, 32000), dtype=np.float32)  # CLIP_LENGTH-shaped, unused values
-    vectors = embedder.embed_clips(clips)
+    clips = np.zeros((4, 1), dtype=np.float32)  # only the row count matters to the fake
+    vectors = fake_embedder.embed_clips(clips)
     assert vectors.shape == (4, EMBEDDING_DIM)
 
     with ParquetEmbeddingWriter(path) as writer:
@@ -159,7 +143,7 @@ def test_parquet_fakeembedder_vectors_roundtrip(tmp_path: Path) -> None:
 
     table = pq.read_table(path)
     got = np.asarray(table.column("embedding").to_pylist(), dtype=np.float32)
-    # FakeEmbedder row i is all-i; confirm those identifiable rows survive.
+    # The fake's identifiable (i + j) rows survive the float32 round trip.
     np.testing.assert_array_equal(got, vectors)
 
 

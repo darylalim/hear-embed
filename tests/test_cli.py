@@ -1,49 +1,23 @@
 """Unit tests for the CLI — torch-free, no real model.
 
 ``hear_embed.cli.main`` lazily does ``from .embedder import HearEmbedder``
-inside the function, so we replace that class with a tiny ``FakeEmbedder``
-(patched at ``hear_embed.embedder.HearEmbedder``) and drive ``main(argv)``
-directly, asserting its integer exit code and the files it writes.
+inside the function, so the shared ``use_fake_embedder`` fixture (see
+``conftest.py``) patches that class with ``FakeEmbedder`` and we drive
+``main(argv)`` directly, asserting its integer exit code and the files it
+writes.
 """
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
-import soundfile as sf
 
 from hear_embed.audio import CLIP_LENGTH, SAMPLE_RATE
 from hear_embed.embedder import EMBEDDING_DIM
 
 
-class FakeEmbedder:
-    """Stand-in for HearEmbedder: no torch, no model, deterministic zeros."""
-
-    def __init__(self, model_id: str = "fake", device: str | None = None) -> None:
-        # Records args so a test could inspect them; loading never happens.
-        self.model_id = model_id
-        self.device = device
-
-    def embed_clips(self, clips: np.ndarray, batch_size: int = 64) -> np.ndarray:
-        # One (512,) zero vector per clip — shape/dtype match the real encoder.
-        return np.zeros((clips.shape[0], EMBEDDING_DIM), dtype=np.float32)
-
-
-def _write_wav(path, *, seconds: float = 3.0, sr: int = SAMPLE_RATE) -> None:
-    """Writes a valid mono wav (length chosen to yield >=1 window)."""
-    n = int(round(seconds * sr))
-    audio = (np.random.default_rng(0).standard_normal(n) * 0.1).astype(np.float32)
-    sf.write(path, audio, sr)
-
-
-@pytest.fixture
-def use_fake_embedder(monkeypatch):
-    """Inject FakeEmbedder where the CLI's lazy import resolves it."""
-    monkeypatch.setattr("hear_embed.embedder.HearEmbedder", FakeEmbedder)
-
-
 @pytest.mark.usefixtures("use_fake_embedder")
-def test_success_writes_parquet_and_returns_0(tmp_path):
+def test_success_writes_parquet_and_returns_0(tmp_path, write_wav):
     import pyarrow.parquet as pq
 
     from hear_embed.cli import main
@@ -51,8 +25,8 @@ def test_success_writes_parquet_and_returns_0(tmp_path):
     input_dir = tmp_path / "in"
     input_dir.mkdir()
     # Two valid 3 s recordings -> 2 windows each (no overlap) -> 4 rows total.
-    _write_wav(input_dir / "a.wav")
-    _write_wav(input_dir / "b.wav")
+    write_wav(input_dir / "a.wav")
+    write_wav(input_dir / "b.wav")
     out = tmp_path / "embeddings.parquet"
 
     code = main([str(input_dir), "--out", str(out), "--format", "parquet"])
@@ -66,12 +40,12 @@ def test_success_writes_parquet_and_returns_0(tmp_path):
 
 
 @pytest.mark.usefixtures("use_fake_embedder")
-def test_npz_format_writes_npy_and_csv(tmp_path):
+def test_npz_format_writes_npy_and_csv(tmp_path, write_wav):
     from hear_embed.cli import main
 
     input_dir = tmp_path / "in"
     input_dir.mkdir()
-    _write_wav(input_dir / "a.wav")
+    write_wav(input_dir / "a.wav")
     out = tmp_path / "embeddings"  # npz writer derives .npy/.csv from the stem
 
     code = main([str(input_dir), "--out", str(out), "--format", "npz"])
@@ -103,7 +77,7 @@ def test_empty_dir_returns_1(tmp_path):
     assert not out.exists()  # writer never opened
 
 
-def test_model_load_failure_returns_2(monkeypatch, tmp_path):
+def test_model_load_failure_returns_2(monkeypatch, tmp_path, write_wav):
     from hear_embed.cli import main
 
     class BoomEmbedder:
@@ -114,7 +88,7 @@ def test_model_load_failure_returns_2(monkeypatch, tmp_path):
 
     input_dir = tmp_path / "in"
     input_dir.mkdir()
-    _write_wav(input_dir / "a.wav")
+    write_wav(input_dir / "a.wav")
     out = tmp_path / "out.parquet"
 
     code = main([str(input_dir), "--out", str(out), "--format", "parquet"])
@@ -124,14 +98,14 @@ def test_model_load_failure_returns_2(monkeypatch, tmp_path):
 
 
 @pytest.mark.usefixtures("use_fake_embedder")
-def test_partial_failure_returns_3_but_writes_good_rows(tmp_path):
+def test_partial_failure_returns_3_but_writes_good_rows(tmp_path, write_wav):
     import pyarrow.parquet as pq
 
     from hear_embed.cli import main
 
     input_dir = tmp_path / "in"
     input_dir.mkdir()
-    _write_wav(input_dir / "good.wav")
+    write_wav(input_dir / "good.wav")
     # A .wav extension over garbage bytes: passes the file scan, fails to load.
     (input_dir / "corrupt.wav").write_bytes(b"not a real wav file at all")
     out = tmp_path / "out.parquet"
@@ -146,15 +120,15 @@ def test_partial_failure_returns_3_but_writes_good_rows(tmp_path):
 
 
 @pytest.mark.usefixtures("use_fake_embedder")
-def test_extensions_filter_limits_scanned_files(tmp_path):
+def test_extensions_filter_limits_scanned_files(tmp_path, write_wav):
     import pyarrow.parquet as pq
 
     from hear_embed.cli import main
 
     input_dir = tmp_path / "in"
     input_dir.mkdir()
-    _write_wav(input_dir / "keep.wav")
-    _write_wav(input_dir / "skip.flac")  # excluded by --extensions wav
+    write_wav(input_dir / "keep.wav")
+    write_wav(input_dir / "skip.flac")  # excluded by --extensions wav
     out = tmp_path / "out.parquet"
 
     code = main(
@@ -175,12 +149,12 @@ def test_extensions_filter_limits_scanned_files(tmp_path):
 
 
 @pytest.mark.usefixtures("use_fake_embedder")
-def test_extensions_filter_excluding_everything_returns_1(tmp_path):
+def test_extensions_filter_excluding_everything_returns_1(tmp_path, write_wav):
     from hear_embed.cli import main
 
     input_dir = tmp_path / "in"
     input_dir.mkdir()
-    _write_wav(input_dir / "only.wav")
+    write_wav(input_dir / "only.wav")
     out = tmp_path / "out.parquet"
 
     # Restrict to .flac while only a .wav exists -> nothing scanned.
