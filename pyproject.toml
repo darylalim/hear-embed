@@ -20,6 +20,7 @@ dependencies = [
     "pyarrow>=14",
     "huggingface-hub>=0.23",
     "tqdm>=4.66",
+    "rich-argparse>=1.8.0",
 ]
 
 [project.scripts]

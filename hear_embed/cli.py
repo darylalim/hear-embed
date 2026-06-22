@@ -6,6 +6,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from rich_argparse import RichHelpFormatter
+
 from .audio import AUDIO_EXTENSIONS, iter_audio_files
 from .embedder import DEFAULT_MODEL_ID
 from .pipeline import embed_file
@@ -19,6 +21,9 @@ def _build_parser() -> argparse.ArgumentParser:
             "Embed health-acoustic recordings with Google HeAR. Long recordings "
             "are windowed into 2-second clips; each clip yields a 512-dim vector."
         ),
+        # Rich-rendered --help (colors, aligned columns). The parser, arguments,
+        # main(), and exit codes are otherwise unchanged from plain argparse.
+        formatter_class=RichHelpFormatter,
     )
     parser.add_argument(
         "input", type=Path, help="Audio file or directory of recordings."
