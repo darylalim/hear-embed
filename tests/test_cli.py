@@ -164,6 +164,27 @@ def test_extensions_filter_excluding_everything_returns_1(tmp_path, write_wav):
     assert not out.exists()
 
 
+def test_help_is_rich_formatted_and_exits_0(capsys):
+    # Reflects the rich-argparse change: the parser opts into RichHelpFormatter,
+    # and `--help` must render (without choking on bracket-y help text like
+    # "[0, 1)") and exit 0 before any model load.
+    from rich_argparse import RichHelpFormatter
+
+    from hear_embed.cli import _build_parser, main
+
+    assert _build_parser().formatter_class is RichHelpFormatter
+
+    with pytest.raises(SystemExit) as excinfo:
+        main(["--help"])
+
+    assert excinfo.value.code == 0
+    out = capsys.readouterr().out
+    # Atomic tokens, robust to Rich's line-wrapping: prog name, an option, model.
+    assert "hear-embed" in out
+    assert "--overlap" in out
+    assert "HeAR" in out
+
+
 def test_clip_length_constant_matches_window_size():
     # Guards the documented 2 s @ 16 kHz contract the CLI's windowing relies on.
     assert CLIP_LENGTH == 32000
