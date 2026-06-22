@@ -52,7 +52,7 @@ load_and_resample ─→ window_audio ─→ HearEmbedder.embed_clips ─→ wri
 - **`embedder.py`** — `HearEmbedder` loads the encoder (CUDA if available else CPU), batches clips, runs the vendored mel-PCEN preprocessing, and takes `pooler_output` as the 512-dim vector.
 - **`pipeline.py`** — `embed_file()` ties load→window→embed together and builds `ClipMetadata` per row; `pool="none"` gives one vector per window, `pool="mean"` averages to one vector per file.
 - **`writers.py`** — `ParquetEmbeddingWriter` **streams** one row group per file (constant memory for large corpora); `NpzEmbeddingWriter` accumulates in memory and writes `<stem>.npy` + `<stem>.csv`. Pick via `make_writer(path, fmt)`.
-- **`cli.py`** — defers model load until files are found, turns any load failure into actionable gating guidance, and skips individual bad files rather than aborting. Exit codes: `0` success, `1` no files found, `2` model load/gating failure, `3` some files skipped.
+- **`cli.py`** — defers model load until files are found, turns any load failure into actionable gating guidance, and skips individual bad files rather than aborting. Exit codes: `0` success, `1` no files found, `2` model load/gating failure, `3` some files skipped. The `argparse` parser uses `rich_argparse.RichHelpFormatter` for a colorized `--help`. **`rich-argparse` is a core dependency** (it pulls in `rich`); unlike the heavy/optional deps above, it's imported normally at module top level — fine here, since it's lightweight and torch-free.
 
 ## Hard invariants
 
