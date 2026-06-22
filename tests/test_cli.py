@@ -165,14 +165,16 @@ def test_extensions_filter_excluding_everything_returns_1(tmp_path, write_wav):
 
 
 def test_help_is_rich_formatted_and_exits_0(capsys):
-    # Reflects the rich-argparse change: the parser opts into RichHelpFormatter,
-    # and `--help` must render (without choking on bracket-y help text like
-    # "[0, 1)") and exit 0 before any model load.
+    # Reflects the rich-argparse change: the parser uses the _RichHelp formatter
+    # (a RichHelpFormatter subclass with markup parsing disabled), and `--help`
+    # renders and exits 0 before any model load.
     from rich_argparse import RichHelpFormatter
 
-    from hear_embed.cli import _build_parser, main
+    from hear_embed.cli import _build_parser, _RichHelp, main
 
-    assert _build_parser().formatter_class is RichHelpFormatter
+    assert issubclass(_RichHelp, RichHelpFormatter)
+    assert _RichHelp.help_markup is False and _RichHelp.text_markup is False
+    assert _build_parser().formatter_class is _RichHelp
 
     with pytest.raises(SystemExit) as excinfo:
         main(["--help"])
@@ -183,6 +185,21 @@ def test_help_is_rich_formatted_and_exits_0(capsys):
     assert "hear-embed" in out
     assert "--overlap" in out
     assert "HeAR" in out
+
+
+def test_help_formatter_keeps_bracketed_text_literal():
+    # Guards the markup-disabled config: with rich-argparse's default
+    # help_markup=True, a help string like "[parquet|npz]" is parsed as a Rich
+    # tag and its bracketed content silently dropped. _RichHelp turns that off,
+    # so bracketed help text renders verbatim.
+    import argparse
+
+    from hear_embed.cli import _RichHelp
+
+    parser = argparse.ArgumentParser(prog="t", formatter_class=_RichHelp)
+    parser.add_argument("--fmt", help="output format [parquet|npz]")
+
+    assert "[parquet|npz]" in parser.format_help()
 
 
 def test_clip_length_constant_matches_window_size():

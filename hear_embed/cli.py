@@ -14,6 +14,19 @@ from .pipeline import embed_file
 from .writers import make_writer
 
 
+class _RichHelp(RichHelpFormatter):
+    """Colorized ``--help`` with rich-argparse's markup parsing turned off.
+
+    The CLI's help strings are plain text (e.g. ``[0, 1)``, ``<out>``). With
+    rich-argparse's default ``help_markup=True`` a string like ``[parquet|npz]``
+    would be parsed as a Rich tag and its bracketed content silently dropped;
+    disabling markup makes all help text render literally.
+    """
+
+    help_markup = False
+    text_markup = False
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hear-embed",
@@ -21,9 +34,9 @@ def _build_parser() -> argparse.ArgumentParser:
             "Embed health-acoustic recordings with Google HeAR. Long recordings "
             "are windowed into 2-second clips; each clip yields a 512-dim vector."
         ),
-        # Rich-rendered --help (colors, aligned columns). The parser, arguments,
-        # main(), and exit codes are otherwise unchanged from plain argparse.
-        formatter_class=RichHelpFormatter,
+        # Colorized --help via rich-argparse (see _RichHelp). The parser,
+        # arguments, main(), and exit codes are unchanged from plain argparse.
+        formatter_class=_RichHelp,
     )
     parser.add_argument(
         "input", type=Path, help="Audio file or directory of recordings."
