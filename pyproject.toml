@@ -9,10 +9,11 @@ description = "Embed health-acoustic recordings with the Google HeAR model."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
-# The audio/IO pipeline (loading, windowing, writing) needs only these. The
-# HeAR encoder's heavy deps (torch, transformers) live in the `model` group
-# below — installed by default locally, skippable in CI — so lint + the
-# torch-free logic tests don't drag in a torch install.
+# Core runtime deps: the audio/IO pipeline (loading, windowing, writing) plus
+# the CLI's colorized --help (rich-argparse). The HeAR encoder's heavy deps
+# (torch, transformers) live in the `model` group below — installed by default
+# locally, skippable in CI — so lint + the torch-free logic tests don't drag in
+# a torch install.
 dependencies = [
     "numpy>=1.26",
     "scipy>=1.11",

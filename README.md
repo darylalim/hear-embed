@@ -71,7 +71,8 @@ uv run hear-embed cough.wav --format npz --out embeddings
 
 Key flags: `--overlap` (window overlap in `[0, 1)`), `--pool` (`none` per-window /
 `mean` per-file), `--batch-size`, `--device` (`cuda`/`cpu`), `--format`
-(`parquet`/`npz`), `--model`, `--extensions`.
+(`parquet`/`npz`), `--model`, `--extensions`. Run `uv run hear-embed --help` for
+the full, colorized reference with defaults.
 
 The default Parquet output is **streamed** (one row group per file), so embedding
 a large corpus never holds all vectors in memory.
