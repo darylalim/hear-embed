@@ -1,4 +1,4 @@
-# hear-embed
+# HeAR Embed
 
 CLI application for embedding human health acoustics using Google
 [HeAR](https://huggingface.co/google/hear-pytorch).
