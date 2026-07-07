@@ -8,6 +8,8 @@ stay *green even when broken* — the class of regression a passing build hides:
 - a bare ``uv run`` re-syncs the default groups, quietly reinstalling a
   dependency group a job just chose to skip, so every ``uv run`` needs
   ``--no-sync``;
+- a ``uv sync`` without ``--locked`` stops asserting the committed lockfile is
+  current, silently accepting a stale ``uv.lock``;
 - a job without ``timeout-minutes`` inherits GitHub's 360-minute default, so a
   hung download can burn hours unnoticed.
 
@@ -74,6 +76,15 @@ def test_uv_run_steps_use_no_sync() -> None:
     for name, line in _run_lines():
         if "uv run" in line:
             assert "--no-sync" in line, f"{name}: `uv run` without --no-sync: {line!r}"
+
+
+def test_uv_sync_steps_are_locked() -> None:
+    # --locked is the CI-side enforcement of the committed-lockfile invariant
+    # (uv.lock is regenerated via `uv lock`, never hand-edited). Guard it like
+    # --no-sync so dropping the flag can't silently stop staleness detection.
+    for name, line in _run_lines():
+        if "uv sync" in line:
+            assert "--locked" in line, f"{name}: `uv sync` without --locked: {line!r}"
 
 
 def test_build_job_builds_and_smoke_tests_the_wheel() -> None:

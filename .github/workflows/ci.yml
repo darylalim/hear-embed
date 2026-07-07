@@ -75,11 +75,11 @@ jobs:
       - name: ty type check
         run: uv run --no-sync ty check
 
-  # Build the wheel + sdist and install the wheel into a fresh env WITHOUT the
-  # model group, proving the package's central promise: it installs and runs
-  # torch-free. Guards packaging regressions the source-tree tests can't see —
-  # a broken console-script entry point, a runtime dep slipping into the model
-  # group, or vendored files/license excluded from the built wheel.
+  # Build the wheel + sdist, install it into a fresh env WITHOUT the model group,
+  # and verify the package's central promise: it installs and runs torch-free.
+  # Guards packaging regressions the source-tree tests can't see — a broken
+  # console-script entry point, a core runtime dep demoted into the model group,
+  # and the vendored preprocessing or license files excluded from the built wheel.
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -95,6 +95,16 @@ jobs:
       - name: Build wheel + sdist
         run: uv build
 
+      # A plain install + import wouldn't notice the vendored preprocessing or a
+      # license file dropping out of the wheel: audio_utils.py is imported lazily
+      # (only via the model path), and a missing License-File breaks nothing at
+      # runtime. Assert both against the built artifact directly.
+      - name: Verify the wheel ships the vendored preprocessing + both licenses
+        run: |
+          unzip -l dist/*.whl | grep -q 'hear_embed/_vendor/audio_utils\.py'
+          unzip -p dist/*.whl '*.dist-info/METADATA' | grep -qx 'License-File: LICENSE'
+          unzip -p dist/*.whl '*.dist-info/METADATA' | grep -qx 'License-File: hear_embed/_vendor/LICENSE.apache-2.0'
+
       # dependency-groups (torch/transformers live in `model`) are not package
       # deps, so a plain wheel install is torch-free by construction.
       - name: Install built wheel in a clean, torch-free env
@@ -106,3 +116,7 @@ jobs:
         run: |
           /tmp/whl-env/bin/hear-embed --help
           /tmp/whl-env/bin/python -c "import hear_embed, hear_embed.cli, hear_embed.audio, hear_embed.pipeline, hear_embed.writers"
+          # Core runtime deps must install with the wheel even though the package
+          # imports them lazily; a bare `import hear_embed` wouldn't catch one
+          # being demoted into the model group.
+          /tmp/whl-env/bin/python -c "import numpy, scipy, soundfile, pyarrow, huggingface_hub, tqdm, rich_argparse"

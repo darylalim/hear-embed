@@ -4,8 +4,8 @@
 (PEP 639), and a root ``LICENSE`` carries the full Apache-2.0 text. These are
 cheap source-tree checks (torch-free, run in CI's ``-m "not model"`` job). The
 distribution-level guarantee — that the *built wheel's* METADATA actually
-carries ``License-File`` entries — is exercised separately by CI's ``build``
-job, which builds the wheel, installs it torch-free, and smoke-tests it (see
+carries ``License-File`` entries for both texts — is exercised separately by
+CI's ``build`` job, which unzips the wheel and asserts them (see
 ``.github/workflows/ci.yml``).
 """
 
@@ -49,6 +49,9 @@ def test_pyproject_declares_license_and_ships_both_texts() -> None:
         None,
     )
     assert files_line is not None, "pyproject.toml does not declare license-files"
-    # Both texts must be listed so the built distribution ships them.
-    assert "LICENSE" in files_line
-    assert "hear_embed/_vendor/LICENSE.apache-2.0" in files_line
+    # Both texts must be listed so the built distribution ships them. Match each
+    # as a *quoted* list element: a bare `"LICENSE" in files_line` is also
+    # satisfied by the vendored path (…/LICENSE.apache-2.0), so it would not catch
+    # the root LICENSE entry being dropped.
+    assert '"LICENSE"' in files_line, "root LICENSE not listed in license-files"
+    assert '"hear_embed/_vendor/LICENSE.apache-2.0"' in files_line
