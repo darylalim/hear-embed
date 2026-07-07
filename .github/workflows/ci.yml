@@ -8,9 +8,17 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs: pushing again to the same branch/PR aborts the older
+# in-progress run instead of letting it finish (saves minutes during a
+# push-until-green loop). Grouped by ref so branches/PRs don't cancel each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -18,6 +26,12 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          # Distinct cache slot per job. This job's env is torch-free
+          # (--no-group model); typecheck's has CPU torch. Both jobs otherwise
+          # derive the same key (same uv.lock + OS) but store different contents,
+          # so without separate suffixes the faster torch-free save evicts the
+          # torch cache and typecheck re-downloads torch on nearly every run.
+          cache-suffix: nomodel
 
       # --no-group model skips torch+transformers since nothing this job runs
       # needs them: ruff is standalone and the non-model tests are numpy-only.
@@ -45,6 +59,7 @@ jobs:
   # (hundreds of MB, cached by setup-uv) rather than the multi-GB CUDA build.
   typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -52,9 +67,42 @@ jobs:
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
+          cache-suffix: model  # own slot so its torch cache isn't evicted (see lint-and-test)
 
       - name: Install dependencies (incl. model group)
         run: uv sync --locked
 
       - name: ty type check
         run: uv run --no-sync ty check
+
+  # Build the wheel + sdist and install the wheel into a fresh env WITHOUT the
+  # model group, proving the package's central promise: it installs and runs
+  # torch-free. Guards packaging regressions the source-tree tests can't see —
+  # a broken console-script entry point, a runtime dep slipping into the model
+  # group, or vendored files/license excluded from the built wheel.
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-suffix: build
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      # dependency-groups (torch/transformers live in `model`) are not package
+      # deps, so a plain wheel install is torch-free by construction.
+      - name: Install built wheel in a clean, torch-free env
+        run: |
+          uv venv /tmp/whl-env
+          uv pip install --python /tmp/whl-env/bin/python dist/*.whl
+
+      - name: Smoke-test console script + torch-free imports
+        run: |
+          /tmp/whl-env/bin/hear-embed --help
+          /tmp/whl-env/bin/python -c "import hear_embed, hear_embed.cli, hear_embed.audio, hear_embed.pipeline, hear_embed.writers"
