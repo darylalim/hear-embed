@@ -15,6 +15,8 @@ call ``sys.exit``.
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,6 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 HOOKS_DIR = REPO_ROOT / ".claude" / "hooks"
 GUARD = HOOKS_DIR / "guard_paths.py"
 CHECK = HOOKS_DIR / "check_torch_free.py"
+WRAPPER = HOOKS_DIR / "_run.sh"
 
 
 def _run_hook(script: Path, tool_name: str, tool_input: dict) -> dict | None:
@@ -57,6 +60,9 @@ def _denied(decision: dict | None) -> bool:
 VENDORED = str(REPO_ROOT / "hear_embed" / "_vendor" / "audio_utils.py")
 VENDORED_NB = str(REPO_ROOT / "hear_embed" / "_vendor" / "notebook.ipynb")
 ENV = str(REPO_ROOT / ".env")
+ENV_LOCAL = str(REPO_ROOT / ".env.local")
+ENV_PROD = str(REPO_ROOT / ".env.production")
+ENV_NESTED = str(REPO_ROOT / "config" / ".env")
 ENV_EXAMPLE = str(REPO_ROOT / ".env.example")
 LOCK = str(REPO_ROOT / "uv.lock")
 NORMAL = str(REPO_ROOT / "hear_embed" / "audio.py")
@@ -70,12 +76,22 @@ NORMAL = str(REPO_ROOT / "hear_embed" / "audio.py")
         ("Write", {"file_path": VENDORED}, True),
         ("NotebookEdit", {"notebook_path": VENDORED_NB}, True),
         ("Read", {"file_path": VENDORED}, False),
+        # MultiEdit is a write tool too (some Claude Code builds expose it) and
+        # must be guarded on every deny rule, not silently allowed.
+        ("MultiEdit", {"file_path": VENDORED}, True),
+        ("MultiEdit", {"file_path": ENV}, True),
+        ("MultiEdit", {"file_path": LOCK}, True),
         # .env holds secrets: read + write blocked; .env.example is fine.
         ("Read", {"file_path": ENV}, True),
         ("Edit", {"file_path": ENV}, True),
         ("Write", {"file_path": ENV}, True),
         ("Read", {"file_path": ENV_EXAMPLE}, False),
         ("Edit", {"file_path": ENV_EXAMPLE}, False),
+        # .env.* variants (matched by basename) and a nested .env are secrets too.
+        ("Read", {"file_path": ENV_LOCAL}, True),
+        ("Edit", {"file_path": ENV_LOCAL}, True),
+        ("Write", {"file_path": ENV_PROD}, True),
+        ("Read", {"file_path": ENV_NESTED}, True),
         # uv.lock is machine-generated: writes blocked, reads fine.
         ("Edit", {"file_path": LOCK}, True),
         ("Write", {"file_path": LOCK}, True),
@@ -154,8 +170,45 @@ def test_torch_free_outside_package_ignored(tmp_path):
     assert _run_hook(CHECK, "Edit", {"file_path": str(stray)}) is None
 
 
+def test_torch_free_multiedit_top_level_torch_warns(tmp_path):
+    # MultiEdit reaches the guard via the PostToolUse matcher just like Edit/Write.
+    path = _write_module(tmp_path, "audio.py", "import torch\n")
+    decision = _run_hook(CHECK, "MultiEdit", {"file_path": path})
+    assert decision is not None
+    assert decision["decision"] == "block"
+
+
 @pytest.mark.parametrize("name", ["audio.py", "pipeline.py", "writers.py"])
 def test_torch_free_real_modules_pass(name):
     # The actual shipped torch-free modules must not trip the guard.
     path = str(REPO_ROOT / "hear_embed" / name)
     assert _run_hook(CHECK, "Edit", {"file_path": path}) is None
+
+
+# --- _run.sh interpreter wrapper (the shipped launch path) -------------------
+
+
+def _run_via_wrapper(script: Path, tool_name: str, tool_input: dict) -> dict | None:
+    """Drive a hook through _run.sh exactly as settings.json does (bash -> python)."""
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash not available")
+    payload = json.dumps({"tool_name": tool_name, "tool_input": tool_input})
+    result = subprocess.run(
+        [bash, str(WRAPPER), str(script)],
+        input=payload,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "CLAUDE_PROJECT_DIR": str(REPO_ROOT)},
+    )
+    assert result.returncode == 0, result.stderr
+    out = result.stdout.strip()
+    return json.loads(out) if out else None
+
+
+def test_run_sh_wrapper_denies_and_allows():
+    # The production path is settings.json -> bash _run.sh -> python hook. Exercise
+    # it end to end so a wrapper regression (interpreter resolution, quoting,
+    # stdin passthrough) can't ship green while every direct-invocation test passes.
+    assert _denied(_run_via_wrapper(GUARD, "Edit", {"file_path": VENDORED}))
+    assert _run_via_wrapper(GUARD, "Read", {"file_path": NORMAL}) is None
