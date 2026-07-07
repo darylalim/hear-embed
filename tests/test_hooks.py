@@ -115,6 +115,19 @@ def test_guard_paths_allows_when_no_path():
     assert _run_hook(GUARD, "Edit", {}) is None
 
 
+def test_env_example_documents_the_token_workflow():
+    # The guard blocks reading .env (test above), so CLAUDE.md points users to
+    # .env.example for the gated-model token setup. Keep that template honest: it
+    # must define HF_TOKEN and show how to load it into a uv command, or the
+    # CLAUDE.md pointer rots silently.
+    text = Path(ENV_EXAMPLE).read_text()
+    assert "HF_TOKEN" in text, ".env.example no longer defines HF_TOKEN"
+    assert "--env-file" in text, (
+        ".env.example no longer shows the `uv run --env-file .env` workflow that "
+        "CLAUDE.md references for the gated model"
+    )
+
+
 # --- check_torch_free.py (PostToolUse) ---------------------------------------
 
 
