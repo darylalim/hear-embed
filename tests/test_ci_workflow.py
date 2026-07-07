@@ -11,8 +11,8 @@ stay *green even when broken* — the class of regression a passing build hides:
 - a job without ``timeout-minutes`` inherits GitHub's 360-minute default, so a
   hung download can burn hours unnoticed.
 
-Parsing needs PyYAML, present in CI via the dev group (pre-commit depends on it);
-the module skips if it is absent rather than erroring.
+Parsing needs PyYAML, a dev-group dependency; ``importorskip`` keeps the module
+ty-clean (``yaml`` typed ``Any``) and skips gracefully if it is somehow absent.
 """
 
 from __future__ import annotations

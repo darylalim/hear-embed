@@ -34,6 +34,10 @@ hear-embed = "hear_embed.cli:main"
 dev = [
     "pre-commit>=4.6.0",
     "pytest>=8",
+    # pyyaml: tests/test_ci_workflow.py parses .github/workflows/ci.yml. Declared
+    # directly (not leaned on transitively via pre-commit) so the invariant tests
+    # always run instead of silently skipping if that transitive dep changes.
+    "pyyaml>=6",
     "ruff>=0.15.17",
     "ty>=0.0.48",
 ]

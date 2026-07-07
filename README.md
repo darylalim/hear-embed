@@ -129,7 +129,9 @@ uv run pytest -m model        # load the real model + one forward pass (see belo
 
 The bulk of the suite is **torch-free** — loading/resampling, windowing,
 writers, pipeline pooling, and the CLI all run without the model or a GPU (a
-fake embedder stands in), so they make up CI's `-m "not model"` job.
+fake embedder stands in), so they make up CI's `-m "not model"` job. That job
+also runs the project-invariant checks: the `.claude/hooks/` guards, the
+license/packaging declarations, and the CI-workflow settings.
 
 `tests/test_model_smoke.py` loads the real `google/hear-pytorch` and runs a
 forward pass, so CI can catch model load / inference breakage. It **skips
@@ -153,9 +155,18 @@ runs in pre-commit and in CI's `typecheck` job; both install the `model` group
 wheels (see the install note above), keeping the job a few hundred MB instead
 of multi-GB.
 
+CI runs three jobs: **lint-and-test** (torch-free lint + tests), **typecheck**
+(ty with the model group), and **build** — which runs `uv build`, installs the
+resulting wheel into a fresh env *without* the model group, and smoke-tests the
+`hear-embed` entry point. The build job is what proves the package installs and
+runs torch-free at the distribution level.
+
 ## License
 
-This repository is Apache-2.0. The HeAR **model weights** are governed
+This repository is Apache-2.0 (see [`LICENSE`](LICENSE)); the built distribution
+ships that text plus the vendored Google license
+([`hear_embed/_vendor/LICENSE.apache-2.0`](hear_embed/_vendor/LICENSE.apache-2.0),
+for the unmodified `audio_utils.py`). The HeAR **model weights** are governed
 separately by the
 [Health AI Developer Foundations terms](https://developers.google.com/health-ai-developer-foundations/terms)
 — notably, clinical/diagnostic use requires appropriate regulatory authorization.
