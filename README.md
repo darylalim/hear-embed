@@ -41,11 +41,11 @@ fetch it if missing). `soundfile` needs the system `libsndfile` library
 (`brew install libsndfile` on macOS; usually preinstalled on Linux).
 
 > With uv, torch resolution is platform-aware: macOS gets the CPU/Metal wheels
-> from PyPI, while Linux gets CPU-only wheels from the PyTorch CPU index
-> configured under `[tool.uv]` in `pyproject.toml` (so CI avoids the multi-GB
-> CUDA build); for CUDA on Linux, swap that index per uv's
+> from PyPI, while Linux gets CPU-only wheels from the PyTorch CPU index that
+> `[[tool.uv.index]]` + `[tool.uv.sources]` configure in `pyproject.toml` (so CI
+> avoids the multi-GB CUDA build); for CUDA on Linux, swap that index per uv's
 > [PyTorch guide](https://docs.astral.sh/uv/guides/integration/pytorch/).
-> pip ignores `[tool.uv]`, so the pip fallback above pulls PyPI's default
+> pip ignores uv's index config, so the pip fallback above pulls PyPI's default
 > torch — the CUDA build on Linux. Add
 > `--index-url https://download.pytorch.org/whl/cpu` there for CPU-only.
 
@@ -54,7 +54,10 @@ fetch it if missing). `soundfile` needs the system `libsndfile` library
 `google/hear-pytorch` is gated under the Health AI Developer Foundations terms:
 
 1. Accept the terms at <https://huggingface.co/google/hear-pytorch>.
-2. `uv run huggingface-cli login` (or export `HF_TOKEN=...`).
+2. Authenticate with a Hugging Face token — either `uv run huggingface-cli
+   login`, or copy `.env.example` to `.env`, add your `HF_TOKEN`, and load it
+   per command with `uv run --env-file .env …` (or `export UV_ENV_FILE=.env`
+   for the whole shell). `.env` is gitignored — never commit it.
 
 ## CLI
 

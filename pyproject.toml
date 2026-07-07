@@ -59,6 +59,8 @@ default-groups = ["dev", "model"]
 # torch. Resolve Linux torch from the PyTorch CPU index instead; macOS keeps
 # PyPI's CPU/Metal wheels. For CUDA on Linux, swap this index per uv's PyTorch
 # guide: https://docs.astral.sh/uv/guides/integration/pytorch/
+# Dropping this pin silently reverts Linux CI to the CUDA build, so
+# tests/test_ci_workflow.py asserts the index + source stay in place.
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
