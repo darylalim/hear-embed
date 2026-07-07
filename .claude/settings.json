@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/_run.sh\" \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/guard_paths.py\"",
+            "statusMessage": "Checking protected paths…"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/_run.sh\" \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/check_torch_free.py\"",
+            "statusMessage": "Checking torch-free boundary…"
+          }
+        ]
+      }
+    ]
+  }
+}

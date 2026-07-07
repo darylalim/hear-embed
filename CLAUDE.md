@@ -67,3 +67,12 @@ load_and_resample ─→ window_audio ─→ HearEmbedder.embed_clips ─→ wri
 - CI's `uv run` steps pass **`--no-sync`** on purpose: a bare `uv run` re-syncs the default groups and would quietly reinstall the `model` group a job just chose to skip. If you add CI steps, keep `--no-sync` after the initial `uv sync`.
 - `pytest` runs with `--strict-markers`; the only registered marker is `model`. Register any new marker in `[tool.pytest.ini_options]` or it will error.
 - Targets Python ≥ 3.10 (`.python-version` pins 3.11 locally; `ty` checks against 3.10). Ruff lint set: `E, F, I, UP, B, SIM`.
+
+## Claude Code hooks
+
+`.claude/settings.json` wires two committed hooks (scripts in `.claude/hooks/`, stdlib-only Python) that mechanically enforce the hard invariants above. They are project config, not code the pipeline imports — but they're linted/typechecked like the rest of the repo (keep them ruff/ty clean).
+
+- **`guard_paths.py` (PreToolUse, `Edit|Write|NotebookEdit|Read`)** — *denies* edits under `hear_embed/_vendor/`, denies read/edit of `.env` (secrets; `.env.example` stays allowed), and denies hand-edits of `uv.lock` (regenerate via `uv lock`). Reads of vendored code and `uv.lock` are fine.
+- **`check_torch_free.py` (PostToolUse, `Edit|Write`)** — warns (feeds a message back) when a **top-level** `import torch`/`transformers` lands in `audio.py`, `pipeline.py`, or `writers.py`; indented lazy imports don't trip it. `embedder.py` is intentionally unguarded.
+- **`_run.sh`** resolves the interpreter — prefers `.venv/bin/python`, then system `python3`/`python`, then `uv run --no-sync python`; if none exists it exits 0 (fails *open* so a missing interpreter can't block every edit). Bare `python3` is not reliably on PATH, which is why the wrapper exists.
+- Editing `.claude/settings.json` while a session is running may not take effect until `/hooks` is reopened or Claude Code restarts (the settings watcher only tracks files that existed at session start).
