@@ -35,7 +35,7 @@ uv run pre-commit install        # run ruff + ty on every commit
 The single most important design decision, and it shapes everything else: the **audio/IO/windowing layer never imports torch**. All heavy or optional dependencies (`torch`, `transformers`, `soundfile`, `scipy`, `pyarrow`, `tqdm`) are imported **lazily inside functions/methods**, never at module top level. Consequences to preserve when editing:
 
 - `torch` + `transformers` live in a separate `model` dependency group, so `uv sync --no-group model` (and CI's lint/test job) gives a working install of everything except the encoder.
-- Everything except the encoder is testable without the model: `tests/test_audio.py` (pure-numpy windowing), `test_audio_io.py` (loading/resampling), `test_writers.py` (Parquet/npz), `test_pipeline.py` (pooling), and `test_cli.py` (exit codes) all run in CI's `-m "not model"` job — the last two use a fake/monkeypatched embedder, so no torch is needed. Only `test_model_smoke.py` loads the real model.
+- Everything except the encoder is testable without the model: `tests/test_audio.py` (pure-numpy windowing), `test_audio_io.py` (loading/resampling), `test_writers.py` (Parquet/npz), `test_pipeline.py` (pooling), `test_cli.py` (exit codes), and `test_hooks.py` (the `.claude/hooks/` guards, run as subprocesses) all run in CI's `-m "not model"` job — the pipeline/CLI ones use a fake/monkeypatched embedder, so no torch is needed. Only `test_model_smoke.py` loads the real model.
 - **Do not add top-level `import torch` / `import transformers` / etc. to the audio or IO modules.** Match the existing lazy-import pattern instead.
 
 ### Data flow
