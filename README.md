@@ -1,7 +1,7 @@
 # hear-embed
 
-Generate embeddings for health-acoustic recordings with the Google
-[HeAR](https://huggingface.co/google/hear-pytorch) model.
+CLI application for embedding human health acoustics using Google
+[HeAR](https://huggingface.co/google/hear-pytorch).
 
 HeAR (Health Acoustic Representations) is a self-supervised encoder trained on
 human non-speech health sounds — coughing, breathing, throat-clearing, laughing,

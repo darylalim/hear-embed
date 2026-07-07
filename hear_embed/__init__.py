@@ -1,4 +1,4 @@
-"""hear-embed: embed health-acoustic recordings with Google HeAR.
+"""hear-embed: CLI application for embedding human health acoustics using Google HeAR.
 
 Typical library use::
 

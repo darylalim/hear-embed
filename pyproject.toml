@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hear-embed"
 version = "0.1.0"
-description = "Embed health-acoustic recordings with the Google HeAR model."
+description = "CLI application for embedding human health acoustics using Google HeAR."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
