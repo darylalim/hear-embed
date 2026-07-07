@@ -27,3 +27,9 @@ embeddings.csv
 .env
 .env.*
 !.env.example
+
+# Claude Code — commit shared config (settings.json, hooks); ignore personal
+# settings and session-local state (scheduled_tasks.lock, checkpoints, etc.).
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
