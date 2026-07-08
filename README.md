@@ -1,19 +1,35 @@
 # HeAR Embed
 
-CLI application for embedding human health acoustics using Google
-[HeAR](https://huggingface.co/google/hear-pytorch).
+[![CI](https://github.com/darylalim/hear-embed/actions/workflows/ci.yml/badge.svg)](https://github.com/darylalim/hear-embed/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+
+`hear-embed` is a CLI **and** Python library for embedding human health acoustics
+using Google [HeAR](https://huggingface.co/google/hear-pytorch).
 
 HeAR (Health Acoustic Representations) is a self-supervised encoder trained on
 human non-speech health sounds — coughing, breathing, throat-clearing, laughing,
-speaking. It turns a **2-second, 16 kHz, mono** clip into a **512-dimensional**
-embedding. This package wraps the PyTorch model with the pieces a real pipeline
-needs: loading arbitrary audio, resampling to the required format, windowing long
-recordings into 2-second clips, batching them through the model, and writing the
-vectors plus their time offsets to disk.
+speaking ([Baur et al. 2024](https://arxiv.org/abs/2403.02522)). It turns a
+**2-second, 16 kHz, mono** clip into a **512-dimensional** embedding. This package
+wraps the PyTorch model with the pieces a real pipeline needs: loading arbitrary
+audio, resampling to the required format, windowing long recordings into 2-second
+clips, batching them through the model, and writing the vectors plus their time
+offsets to disk.
 
 > **Scope note.** HeAR was trained only on *human* health acoustics. It is not
 > designed for general bioacoustics (animals, birds, nature). For those, look at
 > Perch / BirdNET instead.
+
+## Quickstart
+
+```bash
+uv sync                                    # create the env (core + torch + dev tools)
+# then accept the HeAR terms and put your HF token in .env — see Install > Authenticate
+uv run --env-file .env hear-embed cough.wav --out embeddings.parquet
+```
+
+See [Install](#install) for gated-model auth and non-uv setups, and [CLI](#cli) for
+every flag.
 
 ## Install
 
@@ -29,26 +45,6 @@ The HeAR encoder's heavy deps (`torch`, `transformers`) live in a separate
 `model` group so CI can skip them (`uv sync --no-group model`); `uv sync`
 installs them by default for local use.
 
-Without uv, a plain editable install must add the model deps explicitly, since
-pip does not install dependency groups:
-
-```bash
-pip install -e . "torch>=2.1" "transformers==4.50.3" pytest
-```
-
-Requires Python ≥ 3.10 (the repo pins 3.11 via `.python-version`; `uv` will
-fetch it if missing). `soundfile` needs the system `libsndfile` library
-(`brew install libsndfile` on macOS; usually preinstalled on Linux).
-
-> With uv, torch resolution is platform-aware: macOS gets the CPU/Metal wheels
-> from PyPI, while Linux gets CPU-only wheels from the PyTorch CPU index that
-> `[[tool.uv.index]]` + `[tool.uv.sources]` configure in `pyproject.toml` (so CI
-> avoids the multi-GB CUDA build); for CUDA on Linux, swap that index per uv's
-> [PyTorch guide](https://docs.astral.sh/uv/guides/integration/pytorch/).
-> pip ignores uv's index config, so the pip fallback above pulls PyPI's default
-> torch — the CUDA build on Linux. Add
-> `--index-url https://download.pytorch.org/whl/cpu` there for CPU-only.
-
 ### Authenticate (the model is gated)
 
 `google/hear-pytorch` is gated under the Health AI Developer Foundations terms:
@@ -58,6 +54,31 @@ fetch it if missing). `soundfile` needs the system `libsndfile` library
    login`, or copy `.env.example` to `.env`, add your `HF_TOKEN`, and load it
    per command with `uv run --env-file .env …` (or `export UV_ENV_FILE=.env`
    for the whole shell). `.env` is gitignored — never commit it.
+
+### Other install notes
+
+**Not on PyPI.** Install from source. With uv, `uv sync` (above) is the happy
+path; to add it to another project, `uv pip install
+"git+https://github.com/darylalim/hear-embed" "torch>=2.1" "transformers==4.50.3"`.
+
+**Plain pip.** pip does not install dependency groups, so add the model deps
+explicitly:
+
+```bash
+pip install -e . "torch>=2.1" "transformers==4.50.3"
+```
+
+**Python & libsndfile.** Requires Python ≥ 3.10 (the repo pins 3.11 via
+`.python-version`; `uv` will fetch it if missing). `soundfile` needs the system
+`libsndfile` library (`brew install libsndfile` on macOS; usually preinstalled on
+Linux).
+
+**torch wheels.** With uv, torch resolution is platform-aware: macOS gets the
+CPU/Metal wheels from PyPI, Linux gets CPU-only wheels from the PyTorch CPU index
+(so CI avoids the multi-GB CUDA build); for CUDA on Linux, swap that index per
+uv's [PyTorch guide](https://docs.astral.sh/uv/guides/integration/pytorch/). Plain
+pip ignores uv's index config and pulls PyPI's default torch (the CUDA build on
+Linux) — add `--index-url https://download.pytorch.org/whl/cpu` for CPU-only.
 
 ## CLI
 
@@ -72,13 +93,30 @@ uv run hear-embed ./recordings --pool mean --out file_embeddings.parquet
 uv run hear-embed cough.wav --format npz --out embeddings
 ```
 
-Key flags: `--overlap` (window overlap in `[0, 1)`), `--pool` (`none` per-window /
-`mean` per-file), `--batch-size`, `--device` (`cuda`/`cpu`), `--format`
-(`parquet`/`npz`), `--model`, `--extensions`. Run `uv run hear-embed --help` for
-the full, colorized reference with defaults.
+Key flags: `--overlap` (window overlap in `[0, 1)`, default 0), `--pool` (`none`
+per-window / `mean` per-file), `--batch-size` (default 64), `--device`
+(`cuda`/`cpu`), `--format` (`parquet`/`npz`), `--model`, `--extensions`. Run
+`uv run hear-embed --help` for the full, colorized reference with defaults.
+
+Per-file errors are logged to stderr and skipped, so one unreadable recording
+never aborts a batch. Exit codes:
+
+| code | meaning |
+|---|---|
+| `0` | all files embedded |
+| `1` | no audio files found under the input |
+| `2` | model load / gating failure (accept the terms + authenticate) |
+| `3` | finished, but one or more files were skipped |
 
 The default Parquet output is **streamed** (one row group per file), so embedding
 a large corpus never holds all vectors in memory.
+
+A run reports progress on stderr:
+
+```
+Found 3 file(s) to embed.
+Wrote 128 embedding(s) from 3/3 file(s) to embeddings.parquet.
+```
 
 ## Library
 
@@ -108,7 +146,32 @@ vecs = embedder.embed_clips(clips)                                # (n, 512)
 | `start_sec` / `end_sec` | float64 | window start/end, in seconds |
 | `embedding` | list<float32>[512] | the HeAR embedding |
 
+## Using the embeddings
+
+The writers put vectors on disk; here's how to load them back into a matrix.
+Only `numpy` + `pyarrow` are needed — both are core deps, no pandas required:
+
+```python
+import numpy as np
+import pyarrow.parquet as pq
+
+t = pq.read_table("embeddings.parquet")
+X = np.stack(t["embedding"].to_numpy(zero_copy_only=False))            # (n, 512) float32
+meta = t.select(["source_file", "clip_index", "start_sec", "end_sec"])  # row-aligned with X
+
+# npz output instead: X = np.load("embeddings.npy"); metadata is in <stem>.csv,
+# whose leading `row` column is the index into X (X[row] <-> that CSV line).
+
+# Downstream: cosine similarity / nearest-neighbour search over the matrix
+Xn = X / np.linalg.norm(X, axis=1, keepdims=True)
+sims = Xn @ Xn.T          # (n, n) cosine similarities; or feed X to a scikit-learn head
+```
+
 ## How it works
+
+```text
+iter_audio_files → load_and_resample → window_audio → HearEmbedder.embed_clips → writer.write
+```
 
 1. **Load + normalize** (`audio.load_and_resample`) — read via `soundfile`
    (which scales integer PCM to float correctly), downmix to mono, resample to
@@ -147,22 +210,14 @@ run there.
 ```bash
 uv run ruff check --fix    # lint + autofix (incl. import sorting)
 uv run ruff format         # format
-uv run ty check            # type check
+uv run ty check            # type check (Astral's preview checker; version pinned via uv.lock)
 uv run pre-commit install  # run ruff + ty automatically on every commit
 ```
 
-`ty` is Astral's Rust type checker. It is **pre-1.0 (preview)**, so its exact
-version is pinned via `uv.lock` and behavior may shift between releases. It
-runs in pre-commit and in CI's `typecheck` job; both install the `model` group
-(torch/transformers) so ty can resolve those imports. CI gets CPU-only torch
-wheels (see the install note above), keeping the job a few hundred MB instead
-of multi-GB.
-
-CI runs three jobs: **lint-and-test** (torch-free lint + tests), **typecheck**
-(ty with the model group), and **build** — which runs `uv build`, installs the
-resulting wheel into a fresh env *without* the model group, and smoke-tests the
-`hear-embed` entry point. The build job is what proves the package installs and
-runs torch-free at the distribution level.
+CI runs three jobs: lint + tests torch-free, typecheck with the model group, and
+a build that installs the wheel *without* the model group to prove it installs
+and runs torch-free at the distribution level. See [CLAUDE.md](CLAUDE.md) for the
+full CI/tooling rationale.
 
 ## License
 
