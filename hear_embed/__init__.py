@@ -1,6 +1,6 @@
-"""hear-embed: CLI application for embedding human health acoustics using Google HeAR.
+"""hear-embed: embed human health acoustics using Google HeAR.
 
-Typical library use::
+A CLI and Python library. Typical library use::
 
     from hear_embed import HearEmbedder, embed_file
 

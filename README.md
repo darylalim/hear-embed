@@ -24,7 +24,7 @@ offsets to disk.
 
 ```bash
 uv sync                                    # create the env (core + torch + dev tools)
-# then accept the HeAR terms and put your HF token in .env — see Install > Authenticate
+# copy .env.example to .env, add your HF_TOKEN, and accept the HeAR terms — see Install > Authenticate
 uv run --env-file .env hear-embed cough.wav --out embeddings.parquet
 ```
 
@@ -164,7 +164,9 @@ meta = t.select(["source_file", "clip_index", "start_sec", "end_sec"])  # row-al
 
 # Downstream: cosine similarity / nearest-neighbour search over the matrix
 Xn = X / np.linalg.norm(X, axis=1, keepdims=True)
-sims = Xn @ Xn.T          # (n, n) cosine similarities; or feed X to a scikit-learn head
+sims = Xn @ Xn.T   # (n, n) cosine similarities — fine for modest n; for a large corpus
+                   # use batched similarity or an ANN index (faiss/hnswlib). Or feed X
+                   # to a scikit-learn classifier head instead of the full matrix.
 ```
 
 ## How it works

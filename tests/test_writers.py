@@ -238,23 +238,26 @@ def test_parquet_readback_recipe_matches_readme(tmp_path: Path) -> None:
     assert (unit @ unit.T).shape == (4, 4)
 
 
-def test_npz_readback_row_column_indexes_into_npy(tmp_path: Path) -> None:
-    # Locks the README claim that the CSV's leading `row` column is the index into
-    # the .npy matrix (X[row] <-> that CSV line), verified across two write batches.
+def test_npz_readback_join_by_row_aligns_metadata_to_vectors(tmp_path: Path) -> None:
+    # Locks the documented npz read-back join: a CSV line's `row` selects that
+    # line's vector in X, and the line's metadata describes X[row]. Verified BY
+    # VALUE across two sources so it can't pass tautologically — the b.wav rows
+    # must resolve to v2's vectors, not v1's.
     path = tmp_path / "bundle"
     v1, v2 = _vectors(2, seed=1), _vectors(3, seed=2)
     with NpzEmbeddingWriter(path) as writer:
-        writer.write(v1, _metadata(2))
-        writer.write(v2, _metadata(3, source="b.wav"))
+        writer.write(v1, _metadata(2))  # rec.wav, clip_index 0..1
+        writer.write(v2, _metadata(3, source="b.wav"))  # b.wav,  clip_index 0..2
+    per_source = {"rec.wav": v1, "b.wav": v2}
 
     X = np.load(path.with_suffix(".npy"))
     with open(path.with_suffix(".csv"), newline="") as f:
         lines = list(csv.DictReader(f))
-    expected = np.concatenate([v1, v2], axis=0)
-    assert [line["row"] for line in lines] == [str(i) for i in range(len(expected))]
+    assert len(lines) == len(X)
     for line in lines:
-        r = int(line["row"])
-        np.testing.assert_array_equal(X[r], expected[r])  # X[row] is that line's vector
+        expected = per_source[line["source_file"]][int(line["clip_index"])]
+        # X[row] is exactly the vector the (source_file, clip_index) on this line names.
+        np.testing.assert_array_equal(X[int(line["row"])], expected)
 
 
 # --------------------------------------------------------------------------- #
