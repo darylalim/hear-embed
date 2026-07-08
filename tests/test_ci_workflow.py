@@ -11,14 +11,10 @@ stay *green even when broken* — the class of regression a passing build hides:
 - a ``uv sync`` without ``--locked`` stops asserting the committed lockfile is
   current, silently accepting a stale ``uv.lock``;
 - a job without ``timeout-minutes`` inherits GitHub's 360-minute default, so a
-  hung download can burn hours unnoticed;
-- a Linux ``torch`` not pinned to the CPU index silently resolves to the multi-GB
-  CUDA build, so CI stays green while re-downloading gigabytes of ``nvidia-*``
-  wheels every run (guarded from ``pyproject.toml`` below).
+  hung download can burn hours unnoticed.
 
-The workflow parse needs PyYAML, a dev-group dependency; ``importorskip`` keeps
-the module ty-clean (``yaml`` typed ``Any``) and skips gracefully if it is
-somehow absent. The one ``pyproject.toml`` check uses stdlib ``tomllib``.
+Parsing needs PyYAML, a dev-group dependency; ``importorskip`` keeps the module
+ty-clean (``yaml`` typed ``Any``) and skips gracefully if it is somehow absent.
 """
 
 from __future__ import annotations
@@ -32,7 +28,6 @@ yaml: Any = pytest.importorskip("yaml")
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CI = REPO_ROOT / ".github" / "workflows" / "ci.yml"
-PYPROJECT = REPO_ROOT / "pyproject.toml"
 
 _workflow = yaml.safe_load(CI.read_text())
 _jobs = _workflow["jobs"]
@@ -99,27 +94,3 @@ def test_build_job_builds_and_smoke_tests_the_wheel() -> None:
     assert any("hear-embed --help" in line for line in runs), (
         "build job never smoke-tests the console script"
     )
-
-
-def test_pyproject_pins_linux_torch_to_cpu_index() -> None:
-    # On Linux, PyPI's default ``torch`` is the CUDA build plus several GB of
-    # ``nvidia-*`` wheels; CI's typecheck/build jobs only need an importable CPU
-    # torch. pyproject resolves Linux torch from the pytorch-cpu index instead —
-    # dropping this pin is a stays-green-when-broken regression (CI keeps passing
-    # while re-downloading gigabytes every run). Parse the structure rather than
-    # string-match so a `ruff format` reflow of the source line can't fake it.
-    tomllib = pytest.importorskip("tomllib")  # stdlib on 3.11+, the pinned version
-    uv = tomllib.loads(PYPROJECT.read_text())["tool"]["uv"]
-
-    indexes = {idx["name"]: idx["url"] for idx in uv.get("index", [])}
-    assert indexes.get("pytorch-cpu") == "https://download.pytorch.org/whl/cpu", (
-        "the pytorch-cpu index is gone from [[tool.uv.index]]"
-    )
-
-    sources = uv["sources"]["torch"]
-    if isinstance(sources, dict):  # uv accepts a single mapping or a list of them
-        sources = [sources]
-    assert any(
-        s.get("index") == "pytorch-cpu" and "linux" in s.get("marker", "")
-        for s in sources
-    ), "torch is not pinned to the pytorch-cpu index under a Linux marker"

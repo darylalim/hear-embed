@@ -122,9 +122,9 @@ def test_env_example_documents_the_token_workflow():
     # CLAUDE.md pointer rots silently.
     text = Path(ENV_EXAMPLE).read_text()
     assert "HF_TOKEN" in text, ".env.example no longer defines HF_TOKEN"
-    assert "--env-file" in text, (
-        ".env.example no longer shows the `uv run --env-file .env` workflow that "
-        "CLAUDE.md references for the gated model"
+    assert "--env-file" in text or "UV_ENV_FILE" in text, (
+        ".env.example no longer shows a uv token-loading workflow (`--env-file` or "
+        "`UV_ENV_FILE`) that CLAUDE.md references for the gated model"
     )
 
 

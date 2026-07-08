@@ -18,7 +18,7 @@ uv sync --no-group model         # core + dev only; enough for lint + the torch-
 
 uv run pytest                    # all tests (model smoke test auto-skips without deps/access)
 uv run pytest -m "not model"     # everything except the heavy model smoke test
-uv run pytest -m model           # only the real-model smoke test (needs gated access + HF_TOKEN)
+uv run pytest -m model           # real-model smoke test (gated; see the gated-model invariant for auth)
 uv run pytest tests/test_audio.py -k overlap   # a single test / subset
 
 uv run ruff check --fix          # lint + autofix (includes import sorting)
@@ -35,7 +35,7 @@ uv run pre-commit install        # run ruff + ty on every commit
 The single most important design decision, and it shapes everything else: the **audio/IO/windowing layer never imports torch**. All heavy or optional dependencies (`torch`, `transformers`, `soundfile`, `scipy`, `pyarrow`, `tqdm`) are imported **lazily inside functions/methods**, never at module top level. Consequences to preserve when editing:
 
 - `torch` + `transformers` live in a separate `model` dependency group, so `uv sync --no-group model` (and CI's lint/test job) gives a working install of everything except the encoder.
-- Everything except the encoder is testable without the model: `tests/test_audio.py` (pure-numpy windowing), `test_audio_io.py` (loading/resampling), `test_writers.py` (Parquet/npz), `test_pipeline.py` (pooling), `test_cli.py` (exit codes), `test_hooks.py` (the `.claude/hooks/` guards, run as subprocesses), `test_packaging.py` (the `LICENSE`/`license-files` invariants), and `test_ci_workflow.py` (CI-workflow invariants, parsed from `ci.yml` via PyYAML) all run in CI's `-m "not model"` job — the pipeline/CLI ones use a fake/monkeypatched embedder, so no torch is needed. Only `test_model_smoke.py` loads the real model.
+- Everything except the encoder is testable without the model: `tests/test_audio.py` (pure-numpy windowing), `test_audio_io.py` (loading/resampling), `test_writers.py` (Parquet/npz), `test_pipeline.py` (pooling), `test_cli.py` (exit codes), `test_hooks.py` (the `.claude/hooks/` guards, run as subprocesses), `test_packaging.py` (the `LICENSE`/`license-files` invariants + the Linux CPU-torch pin), and `test_ci_workflow.py` (CI-workflow invariants, parsed from `ci.yml` via PyYAML) all run in CI's `-m "not model"` job — the pipeline/CLI ones use a fake/monkeypatched embedder, so no torch is needed. Only `test_model_smoke.py` loads the real model.
 - **Do not add top-level `import torch` / `import transformers` / etc. to the audio or IO modules.** Match the existing lazy-import pattern instead.
 
 ### Data flow
