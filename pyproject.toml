@@ -5,13 +5,27 @@ build-backend = "hatchling.build"
 [project]
 name = "hear-embed"
 version = "0.1.0"
-description = "CLI application for embedding human health acoustics using Google HeAR."
+description = "CLI and Python library for embedding human health acoustics using Google HeAR."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 # Ship the license text in the built distribution (PEP 639). LICENSE covers this
 # project; the _vendor copy covers Google's unmodified audio_utils.py.
 license-files = ["LICENSE", "hear_embed/_vendor/LICENSE.apache-2.0"]
+# Discoverability metadata, mirroring the GitHub repository topics.
+keywords = [
+    "audio",
+    "audio-embeddings",
+    "embeddings",
+    "health-acoustics",
+    "digital-health",
+    "machine-learning",
+    "deep-learning",
+    "pytorch",
+    "huggingface",
+    "transformers",
+    "cli",
+]
 # Core runtime deps: the audio/IO pipeline (loading, windowing, writing) plus
 # the CLI's colorized --help (rich-argparse). The HeAR encoder's heavy deps
 # (torch, transformers) live in the `model` group below — installed by default

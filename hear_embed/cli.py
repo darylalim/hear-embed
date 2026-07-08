@@ -31,9 +31,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="hear-embed",
         description=(
-            "CLI application for embedding human health acoustics using Google "
-            "HeAR. Long recordings are windowed into 2-second clips; each clip "
-            "yields a 512-dim vector."
+            "CLI and Python library for embedding human health acoustics using "
+            "Google HeAR. Long recordings are windowed into 2-second clips; each "
+            "clip yields a 512-dim vector."
         ),
         # Colorized --help via rich-argparse (see _RichHelp). The parser,
         # arguments, main(), and exit codes are unchanged from plain argparse.
