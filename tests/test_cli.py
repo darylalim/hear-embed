@@ -64,6 +64,25 @@ def test_npz_format_writes_npy_and_csv(tmp_path, write_wav):
 
 
 @pytest.mark.usefixtures("use_fake_embedder")
+def test_reports_progress_on_stderr(tmp_path, write_wav, capsys):
+    # Pins the two progress lines the README's CLI sample output advertises, so
+    # that documented user-facing output can't silently drift.
+    from hear_embed.cli import main
+
+    input_dir = tmp_path / "in"
+    input_dir.mkdir()
+    write_wav(input_dir / "a.wav")  # 3 s -> 2 windows, no overlap
+    out = tmp_path / "embeddings.parquet"
+
+    code = main([str(input_dir), "--out", str(out), "--format", "parquet"])
+    err = capsys.readouterr().err
+
+    assert code == 0
+    assert "Found 1 file(s) to embed." in err
+    assert f"Wrote 2 embedding(s) from 1/1 file(s) to {out}." in err
+
+
+@pytest.mark.usefixtures("use_fake_embedder")
 def test_empty_dir_returns_1(tmp_path):
     from hear_embed.cli import main
 

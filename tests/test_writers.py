@@ -209,6 +209,55 @@ def test_npz_empty_write_is_noop(tmp_path: Path) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# README "Using the embeddings" read-back recipes
+# --------------------------------------------------------------------------- #
+
+
+def test_parquet_readback_recipe_matches_readme(tmp_path: Path) -> None:
+    # Locks the "Using the embeddings" snippet: load vectors back with pyarrow +
+    # numpy only (no pandas). Guards the exact documented calls — a pyarrow change
+    # to to_numpy(zero_copy_only=...) or Table.select would fail here, not silently
+    # break the README example.
+    path = tmp_path / "emb.parquet"
+    vectors = _vectors(4)
+    with ParquetEmbeddingWriter(path) as writer:
+        writer.write(vectors, _metadata(4))
+
+    t = pq.read_table(path)
+    X = np.stack(t["embedding"].to_numpy(zero_copy_only=False))  # the documented line
+    meta = t.select(["source_file", "clip_index", "start_sec", "end_sec"])
+
+    assert X.shape == (4, EMBEDDING_DIM)
+    assert X.dtype == np.float32
+    np.testing.assert_array_equal(X, vectors)  # values survive the round trip
+    # The metadata sub-table is pandas-free and row-aligned with X.
+    assert meta.column_names == ["source_file", "clip_index", "start_sec", "end_sec"]
+    assert meta.num_rows == X.shape[0]
+    # The cosine-similarity follow-on the README shows yields an (n, n) matrix.
+    unit = X / np.linalg.norm(X, axis=1, keepdims=True)
+    assert (unit @ unit.T).shape == (4, 4)
+
+
+def test_npz_readback_row_column_indexes_into_npy(tmp_path: Path) -> None:
+    # Locks the README claim that the CSV's leading `row` column is the index into
+    # the .npy matrix (X[row] <-> that CSV line), verified across two write batches.
+    path = tmp_path / "bundle"
+    v1, v2 = _vectors(2, seed=1), _vectors(3, seed=2)
+    with NpzEmbeddingWriter(path) as writer:
+        writer.write(v1, _metadata(2))
+        writer.write(v2, _metadata(3, source="b.wav"))
+
+    X = np.load(path.with_suffix(".npy"))
+    with open(path.with_suffix(".csv"), newline="") as f:
+        lines = list(csv.DictReader(f))
+    expected = np.concatenate([v1, v2], axis=0)
+    assert [line["row"] for line in lines] == [str(i) for i in range(len(expected))]
+    for line in lines:
+        r = int(line["row"])
+        np.testing.assert_array_equal(X[r], expected[r])  # X[row] is that line's vector
+
+
+# --------------------------------------------------------------------------- #
 # make_writer
 # --------------------------------------------------------------------------- #
 
